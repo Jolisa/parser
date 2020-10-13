@@ -41,6 +41,49 @@ class DoubleLinkedList:
 
 		return
 
+
+
+
+	# Adding a node at the front of the list 
+	def push(self, new_data): 
+	  
+		# 1 & 2: Allocate the Node & Put in the data 
+		new_node = Node(data = new_data) 
+	  
+		# 3. Make next of new node as head and previous as NULL 
+		new_node.next = self.head 
+		new_node.prev = None
+	  
+		# 4. change prev of head node to new node  
+		if self.head is not None: 
+			self.head.prev = new_node 
+	  
+		# 5. move the head to point to the new node 
+		self.head = new_node 
+		return 
+	def insertAfter(self, prev_node, new_data): 
+  
+		if prev_node is None: 
+			print("This node doesn't exist in DLL") 
+			return
+  
+		#2. allocate node  & 3. put in the data 
+		new_node = Node(data = new_data) 
+  
+		# 4. Make next of new node as next of prev_node 
+		new_node.next = prev_node.next
+  
+		# 5. Make the next of prev_node as new_node  
+		prev_node.next = new_node 
+  
+		# 6. Make prev_node as previous of new_node 
+		new_node.prev = prev_node 
+  
+		# 7. Change previous of new_node's next node */ 
+		if new_node.next is not None: 
+			new_node.next.prev = new_node 
+		return
+
 	def printListContents(self, node): 
 
 		print "\n"
@@ -48,6 +91,7 @@ class DoubleLinkedList:
 			print(node.data)
 			last = node 
 			node = node.next
+		return
 
 
 ir_list = DoubleLinkedList() 
@@ -637,7 +681,7 @@ def create_ir(file):
 
 	return
 def def_value(): 
-    return "-"
+	return "-"
 
 def rename_registers(file):
 	'''
@@ -650,6 +694,8 @@ def rename_registers(file):
 	sr= defaultdict(def_value)
 	lu = defaultdict(def_value)
 	vr = 0
+	live = 0
+	max_live = 0
 
 
 	curr = ir_list.last
@@ -669,6 +715,10 @@ def rename_registers(file):
 				if sr[curr.data[10]] == "-":		
 					sr[curr.data[10]] = vr
 					vr += 1
+					#keep track of maxlive value
+					live += 1
+					if live > max_live:
+						max_live = live
 				#pair virtual register with sr in logs
 				curr.data[11] = sr[curr.data[10]]
 				#update next use logs
@@ -677,6 +727,8 @@ def rename_registers(file):
 				if curr.data[1] != "store":
 					lu[curr.data[10]] = "-"
 					sr[curr.data[10]] = "-"
+					#keep track of maxlive value
+					live -= 1
 
 			#for first region of source registers
 			if curr.data[1] not in ["loadI"]:
@@ -685,8 +737,17 @@ def rename_registers(file):
 				if sr[curr.data[2]] == "-":		
 					sr[curr.data[2]] = vr
 					vr += 1
+					live += 1
+					if live > max_live:
+						max_live = live
 				#update next use logs
 				curr.data[5] = lu[curr.data[2]] 
+				'''
+				#update max live value
+				if curr.data[5] == "-":
+					live -= 1
+				'''
+
 				#pair virtual register with sr in logs
 				curr.data[3] = sr[curr.data[2]]
 				lu[curr.data[2]] = curr.data[0]
@@ -696,17 +757,315 @@ def rename_registers(file):
 				if sr[curr.data[6]] == "-":		
 					sr[curr.data[6]] = vr
 					vr += 1
+					live += 1
+					if live > max_live:
+						max_live = live
 				#update next use logs
-				curr.data[9] = lu[curr.data[6]] 
+				curr.data[9] = lu[curr.data[6]]
+				''' 
+				#update max live value
+				if curr.data[9] == "-":
+					live -= 1
+				'''
 				#pair virtual register with sr in logs
 				curr.data[7] = sr[curr.data[6]]
 				lu[curr.data[6]] = curr.data[0]
-
+		#print("live amount at end of op line %s is: %d ", (curr.data[0], curr.data[1], live))
 		curr = curr.prev
+	#print("max live was " , max_live)
+	#ir_list.printListContents(ir_list.head);
+	#print_renamed_registers()
 
-	#print("new virtual register representation")
-	#ir_list.printListContents(ir_list.head) 
-	print_renamed_registers()
+	max_live = 0;
+	return max_live, lu, sr
+def allocate_registers(reg, file):
+	max_live, lu, sr = rename_registers(file)
+	reg_stack = []
+	
+	#just for testing purposes
+	#print("reg " , reg)
+	#max_live = int(reg) - 1
+	#k = int(reg) - 1
+	#dict of next uses for registers (perhaps redundant, could be more efficient) 
+	prnu = defaultdict(def_value)
+	spill_loc = defaultdict(def_value)
+
+	#finishing testing purposes
+
+
+	#vr should be initialized to be inverse of sr dict
+	vr2 = defaultdict(def_value)
+	#dict of vr to pr
+	pr2 = defaultdict(def_value)
+	loc = 32768
+
+	k = int(reg)
+	#reserve one register for spill locations
+	if max_live > reg:
+		k = int(reg) - 1
+		#dict of next uses for registers (perhaps redundant, could be more efficient) 
+		prnu = defaultdict(def_value)
+		spill_loc = defaultdict(def_value)
+	
+	#initialize physical register stack
+	i = 0;
+	while i < int(k) - 1 :
+		reg_stack.append(i)
+		i += 1
+
+
+	#iterate through opcodes
+	curr = ir_list.head
+	while (curr != None) :
+		#print("curr " + curr)
+		
+
+		#for first region of source registers
+		if curr.data[1] not in ["loadI"]:
+			vr = curr.data[3]
+			#if pr already  assigned use it
+			if vr2[vr] != "-":
+				pr = vr2[vr]
+				curr.data[4] = pr
+			#get a pr and restore use value
+			else:
+				#if pr available use it
+				if reg_stack:
+					pr = reg_stack.pop()
+							
+				#otherwise spill value to attain pr
+				else:
+					#spill value, update ir
+					pr = get_pr(curr, prnu, loc, k)
+					#update vr to spillloc dict with previous vr
+					spill_loc[pr2[pr]] = loc
+					#######spill_loc[curr.data[3]] = loc
+					#update loc value
+					loc = loc + 4
+				#restore use value
+				restore(curr, spill_loc[vr], k, pr)	
+				curr.data[4] = pr
+				#update prvr mappings
+				vr2[vr] = pr
+				pr2[pr] = vr
+			#check whether use is last use instance
+			if curr.data[5] == "-":
+				#free physical register
+				vr2[vr] = "-"
+				pr2[pr] = "-"
+				#add freed register to stack
+				reg_stack.append(pr)
+			#mark next use of physical register in mapping
+			prnu[pr] = curr.data[5] 
+
+		#for second region of source registers
+		if curr.data[1] not in ["load", "loadI", "store"]:
+			vr = curr.data[7]
+			#if pr already  assigned use it
+			if vr2[vr] != "-":
+				pr = vr2[vr]
+				curr.data[8] = pr
+			#get a pr and restore use value
+			else:
+				#if pr available use it
+				if reg_stack:
+					pr = reg_stack.pop()
+							
+				#otherwise spill value to attain pr
+				else:
+					#spill value, update ir
+					pr = get_pr(curr, prnu, loc, k)
+					#update vr to spillloc dict with previous vr
+					spill_loc[pr2[pr]] = loc
+					#######spill_loc[curr.data[3]] = loc
+					#update loc value
+					loc = loc + 4
+				#restore use value
+				restore(curr, spill_loc[vr], k, pr)	
+				curr.data[8] = pr
+				#update prvr mappings
+				vr2[vr] = pr
+				pr2[pr] = vr
+			#check whether use is last use instance
+			if curr.data[9] == "-":
+				#free physical register
+				vr2[vr] = "-"
+				pr2[pr] = "-"
+				#add freed register to stack
+				reg_stack.append(pr)
+			#mark next use of physical register in mapping
+			prnu[pr] = curr.data[9] 
+		#for last region of source registers
+		if curr.data[1] not in []:
+			vr = curr.data[11]
+			#if pr already  assigned use it
+			if vr2[vr] != "-":
+				pr = vr2[vr]
+				curr.data[12] = pr
+			#get a pr and restore use value
+			else:
+				#if pr available use it
+				if reg_stack:
+					pr = reg_stack.pop()				
+				#otherwise spill value to attain pr
+				else:
+					#spill value, update ir
+					pr = get_pr(curr, prnu, loc, k)
+					#update vr to spillloc dict with previous vr
+					spill_loc[pr2[pr]] = loc
+					#update loc value
+					loc = loc + 4
+
+				curr.data[12] = pr
+				#update prvr mappings
+				vr2[vr] = pr
+				pr2[pr] = vr
+			#check whether use is last use instance
+			if curr.data[13] == "-":
+				#free physical register
+				vr2[vr] = "-"
+				pr2[pr] = "-"
+				#add freed register to stack
+				reg_stack.append(pr)
+			#mark next use of physical register in mapping
+			prnu[pr] = curr.data[13] 
+
+
+		curr = curr.next
+	#print("this is the final ir allowing for physical register placement")
+	#ir_list.printListContents(ir_list.head)  
+	print_reallocated_registers()      
+	return 
+
+def restore(curr, loc, k, new_pr):
+	'''
+
+	Effects:
+	Restore the contents of a spilled register to a new physical register, updates intermediate representation
+	'''
+	#add loadi operation to IR
+	loadI = ["-"] *  14
+	loadI[0] = "restore"
+	loadI[1] = "loadI"
+	loadI[2] = loc
+	loadI[12] = k
+	loadI[13] = curr.data[0]
+	if curr.prev == None:
+		ir_list.push(loadI)
+	else:
+		ir_list.insertAfter(curr.prev, loadI)
+
+
+	#add load operation to IR
+	
+	load = ["-"] *  14
+	load[0] = "restore"
+	load[1] = "load"
+	load[3] = k
+	load[12] = new_pr
+	load[13] = curr.data[0]
+	if curr.prev == None:
+		ir_list.push(load)
+	else:
+		ir_list.insertAfter(curr.prev, load)
+
+	return
+
+
+def get_pr(curr, prnu, loc, free_pr):
+	'''
+
+	Effects:
+	Returns the identifier of a physical register to whose data has been freed for reallocation
+	'''
+	#TODOOOOO, can be optimized for loadi operation
+
+	nu_val = -1
+	pr_val = "-"
+	for pr, nu in prnu.items():
+		if int(nu) > nu_val:
+			pr_val = pr
+			nu_val = nu
+	#add loadi operation to IR
+	loadI = ["-"] *  14
+	loadI[0] = "spill"
+	loadI[1] = "loadI"
+	loadI[2] = loc
+	loadI[12] = free_pr
+	if curr.prev == None:
+		ir_list.push(loadI)
+	else:
+		ir_list.insertAfter(curr.prev, loadI)
+
+	#add store operation to IR
+	store = ["-"] *  14
+	store[0] = "spill"
+	store[1] = "store"
+	store[3] = pr_val
+	store[12] = free_pr
+	if curr.prev == None:
+		ir_list.push(store)
+	else:
+		ir_list.insertAfter(curr.prev, store)
+
+
+
+
+	return pr_val
+
+def print_reallocated_registers():
+	'''
+
+	Effects:
+	Prints to standard out a complete file with new virtual representation of the registers
+	'''
+	curr = ir_list.head
+	while curr!= None:
+		#print opname
+		sys.stdout.write(" %s " % curr.data[1])
+
+		#print first region
+		if curr.data[1] != "nop":
+			#if not a register print the constant at location
+			if curr.data[1] in ["loadI", "output"]:
+				sys.stdout.write(" %s " % curr.data[2])
+				#if output, no further printing needed
+				if curr.data[1] == "output":
+					curr = curr.next
+					sys.stdout.write("\n")
+					continue
+
+
+			#if a register print the register, potentially with a comma as well
+			else:
+				if curr.data[1] not in ["load", "store"]:
+					sys.stdout.write(" r%s, " % curr.data[4])
+				else:
+					sys.stdout.write(" r%s " % curr.data[4])
+
+
+		#if nop, no further printing needed
+		else:
+			curr = curr.next
+			sys.stdout.write("\n")
+			continue
+
+		#print second region
+		if curr.data[1] not in ["load", "loadI", "store"]:
+			sys.stdout.write(" r%s " % curr.data[8])
+
+		#print arrow
+		sys.stdout.write(" => ") 
+		#print third region
+		sys.stdout.write(" r%s " % curr.data[12])
+
+		#print the new linked list item
+		print("data is : " , curr.data)
+
+		#advance pointer
+		curr = curr.next
+		#print new line
+		sys.stdout.write("\n")
 
 	return
 
@@ -1024,16 +1383,19 @@ def main():
 	parser.add_option("-r", help="Prints out parser's intermediate representation in a human readable format", action="store_true")
 	parser.add_option("-p", help="Prints out parsing details, including errors and line number for error if parsing is unsuccessful", action="store_true")
 	parser.add_option("-x", help="Renames source registers in provided file to corresponding virtual registers", action="store_true")
+	parser.add_option("-k", help="Allocates registers", action="store_true")
 	(options, args) = parser.parse_args()
 
 	scan = options.s
 	parse = options.p
 	read = options.r
 	rename = options.x
+	allocate = options.k
 
 	#determine the filename from command line
 	filename = sys.argv[-1]
 	
+	registers = sys.argv[-2]
 
 	
 
@@ -1048,9 +1410,13 @@ def main():
 	elif rename:
 		#print intermediate representation
 		rename_registers(file)
+	elif allocate:
+		#print intermediate representation
+		allocate_registers(registers, file)
 	else:
-		parse_file(file)
+		#parse_file(file)
 		#test_func()
+		allocate_registers(registers, file)
 
 	#close file
 	file.close() 
