@@ -778,8 +778,10 @@ def rename_registers(file):
 
 	max_live = 0;
 	return max_live, lu, sr
-def allocate_registers(reg, file):
-	max_live, lu, sr = rename_registers(file)
+
+
+def allocate_easy(reg, file):
+
 	reg_stack = []
 	
 	#just for testing purposes
@@ -787,26 +789,22 @@ def allocate_registers(reg, file):
 	#max_live = int(reg) - 1
 	#k = int(reg) - 1
 	#dict of next uses for registers (perhaps redundant, could be more efficient) 
-	prnu = defaultdict(def_value)
-	spill_loc = defaultdict(def_value)
+	#prnu = defaultdict(def_value)
+	#spill_loc = defaultdict(def_value)
 
 	#finishing testing purposes
-
+	print("inside allocate easy")
 
 	#vr should be initialized to be inverse of sr dict
 	vr2 = defaultdict(def_value)
 	#dict of vr to pr
 	pr2 = defaultdict(def_value)
-	loc = 32768
+	#loc = 32768
 
 	k = int(reg)
-	#reserve one register for spill locations
-	if max_live > reg:
-		k = int(reg) - 1
-		#dict of next uses for registers (perhaps redundant, could be more efficient) 
-		prnu = defaultdict(def_value)
-		spill_loc = defaultdict(def_value)
 	
+	max_live, lu, sr = rename_registers(file)
+	print("max_live is " , max_live)
 	#initialize physical register stack
 	i = 0;
 	while i < int(k) - 1 :
@@ -829,6 +827,179 @@ def allocate_registers(reg, file):
 				if vr2[vr] != "-":
 					pr = vr2[vr]
 					curr.data[4] = pr
+				#get a pr and restore use value
+				else:
+					print("1: enough registers: shouldn't enter the condition where spilling needed ")
+				
+				#check whether use is last use instance
+				'''
+				if curr.data[5] == "-":
+					#free physical register
+					vr2[vr] = "-"
+					pr2[pr] = "-"
+					#add freed register to stack
+					reg_stack.append(pr)
+				'''
+				#mark next use of physical register in mapping
+				#prnu[pr] = curr.data[5] 
+				for vra, pra in vr2.items():
+					prb = vr2[vra]
+					#if pr2[prb] != pra:
+					'''
+					if pr2[pra] != vra:
+						print("3: vr2pr : %s, %s" % (vra, pra))
+						print("3: pr2vr : %s, %s" % (pra, pr2[pra]))
+						print("We have found a MISMATCHED dictionary at : " , curr.data)
+					'''
+
+			#for second region of source registers
+			if curr.data[1] not in ["load", "loadI", "store"]:
+				pr0 = pr
+				vr = curr.data[7]
+				#if pr already  assigned use it
+				if vr2[vr] != "-":
+					pr = vr2[vr]
+					curr.data[8] = pr
+				#get a pr and restore use value
+				else:
+					print("2: enough registers: shouldn't enter the condition where spilling needed ")
+					#if pr2[prb] != pra:
+					''''
+					if pr2[pra] != vra:
+						print("3: vr2pr : %s, %s" % (vra, pra))
+						print("3: pr2vr : %s, %s" % (pra, pr2[pra]))
+						print("We have found a MISMATCHED dictionary at : " , curr.data)
+					'''
+			#check whether uses were last uses in regions two and three
+			
+			if curr.data[5] == "-" and vr2[curr.data[3]]!= "-":
+				#free physical register
+				vr2[curr.data[3]] = "-"
+				pr2[curr.data[4]] = "-"
+				#add freed register to stack
+				reg_stack.append(pr)
+			if curr.data[9] == "-" and vr2[curr.data[7]]!= "-":
+					#free physical register
+					vr2[curr.data[7]] = "-"
+					pr2[curr.data[8]] = "-"
+					#add freed register to stack
+					reg_stack.append(pr)
+			
+			#for last region of source registers
+			if curr.data[1] not in []:
+				vr = curr.data[11]
+				#if pr already  assigned use it
+				if vr2[vr] != "-":
+					pr = vr2[vr]
+					curr.data[12] = pr
+					#sanity check
+					if pr2[pr] != vr:
+						print("equivalency fail 1")
+				#get a pr and restore use value
+				else:
+					#if pr available use it
+					if reg_stack:
+						pr = reg_stack.pop()				
+					#otherwise spill value to attain pr
+					else:
+						print("3: enough registers: shouldn't enter the condition where spilling needed ")
+
+					curr.data[12] = pr
+					#update prvr mappings
+					#print("vr is: ", vr)
+					vr2[vr] = pr
+					pr2[pr] = vr
+					#print("first Line check")
+					#print("vr2 at 0 :", vr2[0])
+					#print("pr2 at 2 :", pr2[2])
+					#sanity check
+					if pr2[pr] != vr:
+						print("equivalency fail 2a")
+					if vr2[vr] != pr:
+						print("equivalency fail 2b")
+				#check whether use is last use instance
+				'''
+				if curr.data[13] == "-":
+					#free physical register
+					vr2[vr] = "-"
+					pr2[pr] = "-"
+					#add freed register to stack
+					reg_stack.append(pr)
+				'''
+				
+		
+		
+
+
+		curr = curr.next
+	#print("this is the final ir allowing for physical register placement")
+	#ir_list.printListContents(ir_list.head)  
+	print_reallocated_registers()      
+	return 
+
+
+def allocate_registers(reg, file):
+	
+	reg_stack = []
+	
+	#just for testing purposes
+	#print("reg " , reg)
+	#max_live = int(reg) - 1
+
+	#k = int(reg) - 1
+	#dict of next uses for registers (perhaps redundant, could be more efficient) 
+	prnu = defaultdict(def_value)
+	spill_loc = defaultdict(def_value)
+	max_live, lu, sr = rename_registers(file)
+	#finishing testing purposes
+	#print("max_live start is  " , max_live)
+
+	#vr should be initialized to be inverse of sr dict
+	vr2 = defaultdict(def_value)
+	#dict of vr to pr
+	pr2 = defaultdict(def_value)
+	loc = 32768
+
+	k = int(reg) - 1
+	'''
+	k = int(reg)
+	#reserve one register for spill locations
+	if max_live > reg:
+		k = int(reg) - 1
+		#dict of next uses for registers (perhaps redundant, could be more efficient) 
+		prnu = defaultdict(def_value)
+		spill_loc = defaultdict(def_value)
+	else:
+		return allocate_easy(reg, file)
+	'''
+	#initialize physical register stack
+	i = 0;
+	while i < int(k) :
+		reg_stack.append(i)
+		i += 1
+	#print("Length of reg stack is : ", len(reg_stack))
+
+
+	#iterate through opcodes
+	curr = ir_list.head
+	while (curr != None) :
+		#print("curr " + curr)
+		#skip this process for nops
+		if curr.data[1] not in ["nop", "output"]:
+		
+
+			#for first region of source registers
+			if curr.data[1] not in ["loadI"]:
+				vr = curr.data[3]
+				#if pr already  assigned use it
+				if vr2[vr] != "-":
+					pr = vr2[vr]
+					pr2[pr] = vr
+					curr.data[4] = pr
+					if pr2[pr] != vr:
+						print("equivalency fail 1:1a")
+					if vr2[vr] != pr:
+						print("equivalency fail 1:1b")
 				#get a pr and restore use value
 				else:
 					#if pr available use it
@@ -856,17 +1027,23 @@ def allocate_registers(reg, file):
 					curr.data[4] = pr
 					#update prvr mappings
 					#based on piazza post, commenting this out for a moment
-					vr2[vr] = pr
-					pr2[pr] = vr
+					#vr2[vr] = pr
+					#pr2[pr] = vr
+					if pr2[pr] != vr:
+						print("equivalency fail 1:2a")
+					if vr2[vr] != pr:
+						print("equivalency fail 1:2b")
 
 				
 				#check whether use is last use instance
+				'''
 				if curr.data[5] == "-":
 					#free physical register
 					vr2[vr] = "-"
 					pr2[pr] = "-"
 					#add freed register to stack
 					reg_stack.append(pr)
+				'''
 				
 				#mark next use of physical register in mapping
 				prnu[pr] = curr.data[5] 
@@ -879,7 +1056,14 @@ def allocate_registers(reg, file):
 						print("3: pr2vr : %s, %s" % (pra, pr2[pra]))
 						print("We have found a MISMATCHED dictionary at : " , curr.data)
 					'''
-
+			
+			for vra, pra in vr2.items():
+				prb = vr2[vra]
+				if pra != prb:
+					print("1: We have found a MISMATCHED dictionary at " )
+					print("pr2vr: %s  %s"  % (pr, vr))
+					print("vr2pr: %s  %s"  % (vr, pr))
+			
 			#for second region of source registers
 			if curr.data[1] not in ["load", "loadI", "store"]:
 				pr0 = pr
@@ -887,6 +1071,7 @@ def allocate_registers(reg, file):
 				#if pr already  assigned use it
 				if vr2[vr] != "-":
 					pr = vr2[vr]
+					pr2[pr] = vr
 					curr.data[8] = pr
 				#get a pr and restore use value
 				else:
@@ -914,16 +1099,18 @@ def allocate_registers(reg, file):
 					curr.data[8] = pr
 					#update prvr mappings
 					#based on piazza post, commenting this out for a moment
-					vr2[vr] = pr
-					pr2[pr] = vr
+					#vr2[vr] = pr
+					#pr2[pr] = vr
 			
 				#check whether use is last use instance
+				'''
 				if curr.data[9] == "-":
 					#free physical register
 					vr2[vr] = "-"
 					pr2[pr] = "-"
 					#add freed register to stack
 					reg_stack.append(pr)
+				'''
 				
 				#mark next use of physical register in mapping
 				prnu[pr] = curr.data[9] 
@@ -936,8 +1123,14 @@ def allocate_registers(reg, file):
 						print("3: pr2vr : %s, %s" % (pra, pr2[pra]))
 						print("We have found a MISMATCHED dictionary at : " , curr.data)
 					'''
+			
+			for vra, pra in vr2.items():
+				prb = vr2[vra]
+				if pra != prb:
+					print("2: We have found a MISMATCHED dictionary at " )
+			
 			#check whether uses were last uses in regions two and three
-			'''
+			
 			if curr.data[5] == "-" and vr2[curr.data[3]]!= "-":
 				#free physical register
 				vr2[curr.data[3]] = "-"
@@ -950,17 +1143,24 @@ def allocate_registers(reg, file):
 					pr2[curr.data[8]] = "-"
 					#add freed register to stack
 					reg_stack.append(pr)
-			'''
+			
 			#for last region of source registers
 			if curr.data[1] not in []:
 				vr = curr.data[11]
 				#if pr already  assigned use it
 				if vr2[vr] != "-":
 					pr = vr2[vr]
+					pr2[pr] = vr
 					curr.data[12] = pr
 					#sanity check
 					if pr2[pr] != vr:
 						print("equivalency fail 1")
+						print("vr is: ", vr)
+						print("pr is: ", pr)
+						print("pr2 is: ", pr2[pr])
+						print("vr2 is: ", vr2[vr])
+						print("pr2vr: %s  %s"  % (pr, vr))
+						print("vr2pr: %s  %s"  % (vr, pr))
 				#get a pr and restore use value
 				else:
 					#if pr available use it
@@ -998,14 +1198,14 @@ def allocate_registers(reg, file):
 					reg_stack.append(pr)
 				'''
 				#sanity check
-				'''
+				
 				if pr2[pr] != vr:
 					print("equivalency fail 3a")
-					print("pr2vr: %s  %s"  % (pr, vr))
+					#print("pr2vr: %s  %s"  % (pr, vr))
 				if vr2[vr] != pr:
 					print("equivalency fail 3b")
-					print("vr2pr: %s  %s"  % (vr, pr))
-				'''
+					#print("vr2pr: %s  %s"  % (vr, pr))
+				
 				#mark next use of physical register in mapping
 				prnu[pr] = curr.data[13] 
 				for vra, pra in vr2.items():
@@ -1018,12 +1218,12 @@ def allocate_registers(reg, file):
 						print("We have found a MISMATCHED dictionary at : " , curr.data)
 					'''
 		#add check for whether vr and pr dictionaries are equivalent
-		'''
-		for vr, pr in vr2.items():
-			pr0 = vr2[vr]
-			if pr2[pr] != pr0:
-				print("We have found a MISMATCHED dictionary at : " , curr.data)
-		'''
+		
+		for vra, pra in vr2.items():
+			prb = vr2[vra]
+			if pra != prb:
+				print("3: We have found a MISMATCHED dictionary at " )
+		
 		
 
 
@@ -1096,7 +1296,13 @@ def get_pr(curr, prnu, loc, free_pr, old_pr):
 	nu_val = -1
 	pr_val = "-"
 	for pr, nu in prnu.items():
-		if int(nu) > nu_val and pr != old_pr:
+		if nu == "-":
+			#print("pr for - nu val was ", pr)
+			pr_val = pr
+			nu_val = nu
+			break
+
+		if int(nu) > nu_val and pr != old_pr :
 			pr_val = pr
 			nu_val = nu
 	#add loadi operation to IR
@@ -1173,7 +1379,7 @@ def print_reallocated_registers():
 		sys.stdout.write(" r%s " % curr.data[12])
 
 		#print the new linked list item
-		print("data is : " , curr.data)
+		#print("data is : " , curr.data)
 
 		#advance pointer
 		curr = curr.next
