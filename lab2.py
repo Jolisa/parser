@@ -818,117 +818,213 @@ def allocate_registers(reg, file):
 	curr = ir_list.head
 	while (curr != None) :
 		#print("curr " + curr)
+		#skip this process for nops
+		if curr.data[1] not in ["nop", "output"]:
 		
 
-		#for first region of source registers
-		if curr.data[1] not in ["loadI"]:
-			vr = curr.data[3]
-			#if pr already  assigned use it
-			if vr2[vr] != "-":
-				pr = vr2[vr]
-				curr.data[4] = pr
-			#get a pr and restore use value
-			else:
-				#if pr available use it
-				if reg_stack:
-					pr = reg_stack.pop()
-							
-				#otherwise spill value to attain pr
+			#for first region of source registers
+			if curr.data[1] not in ["loadI"]:
+				vr = curr.data[3]
+				#if pr already  assigned use it
+				if vr2[vr] != "-":
+					pr = vr2[vr]
+					curr.data[4] = pr
+				#get a pr and restore use value
 				else:
-					#spill value, update ir
-					pr = get_pr(curr, prnu, loc, k)
-					#update vr to spillloc dict with previous vr
-					spill_loc[pr2[pr]] = loc
-					#######spill_loc[curr.data[3]] = loc
-					#update loc value
-					loc = loc + 4
-				#restore use value
-				restore(curr, spill_loc[vr], k, pr)	
-				curr.data[4] = pr
-				#update prvr mappings
-				vr2[vr] = pr
-				pr2[pr] = vr
-			#check whether use is last use instance
-			if curr.data[5] == "-":
-				#free physical register
-				vr2[vr] = "-"
-				pr2[pr] = "-"
-				#add freed register to stack
-				reg_stack.append(pr)
-			#mark next use of physical register in mapping
-			prnu[pr] = curr.data[5] 
+					#if pr available use it
+					if reg_stack:
+						pr = reg_stack.pop()
+								
+					#otherwise spill value to attain pr
+					else:
+						#spill value, update ir
+						print("spill region 1")
+						pr = get_pr(curr, prnu, loc, k, None)
+						#update vr to spillloc dict with previous vr
+						spill_loc[pr2[pr]] = loc
+						#######spill_loc[curr.data[3]] = loc
+						#update loc value
+						loc = loc + 4
+					#restore use value
+					#print("data is : ", curr.data)
+					#print("SPILL location dictionary (use 1) is : ")
+					#print("vr value is ", vr)
+					#for key, value in spill_loc.items():
+						#print("key, value : %s  %s" % (key, value))
+					print("restoring at register 1")
+					restore(curr, spill_loc[vr], k, pr)	
+					curr.data[4] = pr
+					#update prvr mappings
+					#based on piazza post, commenting this out for a moment
+					vr2[vr] = pr
+					pr2[pr] = vr
 
-		#for second region of source registers
-		if curr.data[1] not in ["load", "loadI", "store"]:
-			vr = curr.data[7]
-			#if pr already  assigned use it
-			if vr2[vr] != "-":
-				pr = vr2[vr]
-				curr.data[8] = pr
-			#get a pr and restore use value
-			else:
-				#if pr available use it
-				if reg_stack:
-					pr = reg_stack.pop()
-							
-				#otherwise spill value to attain pr
-				else:
-					#spill value, update ir
-					pr = get_pr(curr, prnu, loc, k)
-					#update vr to spillloc dict with previous vr
-					spill_loc[pr2[pr]] = loc
-					#######spill_loc[curr.data[3]] = loc
-					#update loc value
-					loc = loc + 4
-				#restore use value
-				restore(curr, spill_loc[vr], k, pr)	
-				curr.data[8] = pr
-				#update prvr mappings
-				vr2[vr] = pr
-				pr2[pr] = vr
-			#check whether use is last use instance
-			if curr.data[9] == "-":
-				#free physical register
-				vr2[vr] = "-"
-				pr2[pr] = "-"
-				#add freed register to stack
-				reg_stack.append(pr)
-			#mark next use of physical register in mapping
-			prnu[pr] = curr.data[9] 
-		#for last region of source registers
-		if curr.data[1] not in []:
-			vr = curr.data[11]
-			#if pr already  assigned use it
-			if vr2[vr] != "-":
-				pr = vr2[vr]
-				curr.data[12] = pr
-			#get a pr and restore use value
-			else:
-				#if pr available use it
-				if reg_stack:
-					pr = reg_stack.pop()				
-				#otherwise spill value to attain pr
-				else:
-					#spill value, update ir
-					pr = get_pr(curr, prnu, loc, k)
-					#update vr to spillloc dict with previous vr
-					spill_loc[pr2[pr]] = loc
-					#update loc value
-					loc = loc + 4
+				
+				#check whether use is last use instance
+				if curr.data[5] == "-":
+					#free physical register
+					vr2[vr] = "-"
+					pr2[pr] = "-"
+					#add freed register to stack
+					reg_stack.append(pr)
+				
+				#mark next use of physical register in mapping
+				prnu[pr] = curr.data[5] 
+				for vra, pra in vr2.items():
+					prb = vr2[vra]
+					#if pr2[prb] != pra:
+					'''
+					if pr2[pra] != vra:
+						print("3: vr2pr : %s, %s" % (vra, pra))
+						print("3: pr2vr : %s, %s" % (pra, pr2[pra]))
+						print("We have found a MISMATCHED dictionary at : " , curr.data)
+					'''
 
-				curr.data[12] = pr
-				#update prvr mappings
-				vr2[vr] = pr
-				pr2[pr] = vr
-			#check whether use is last use instance
-			if curr.data[13] == "-":
+			#for second region of source registers
+			if curr.data[1] not in ["load", "loadI", "store"]:
+				pr0 = pr
+				vr = curr.data[7]
+				#if pr already  assigned use it
+				if vr2[vr] != "-":
+					pr = vr2[vr]
+					curr.data[8] = pr
+				#get a pr and restore use value
+				else:
+					#if pr available use it
+					if reg_stack:
+						pr = reg_stack.pop()
+								
+					#otherwise spill value to attain pr
+					else:
+						#spill value, update ir
+						print("spill region 2")
+						pr = get_pr(curr, prnu, loc, k, pr0)
+						#update vr to spillloc dict with previous vr
+						spill_loc[pr2[pr]] = loc
+						#######spill_loc[curr.data[3]] = loc
+						#update loc value
+						loc = loc + 4
+					#restore use value
+					#print("SPILL location dictionary (use 2) is : ")
+					#print("vr value is ", vr)
+					#for key, value in spill_loc.items():
+						#print("key, value : %s  %s" % (key, value))
+					print("restoring at register 2")
+					restore(curr, spill_loc[vr], k, pr)	
+					curr.data[8] = pr
+					#update prvr mappings
+					#based on piazza post, commenting this out for a moment
+					vr2[vr] = pr
+					pr2[pr] = vr
+			
+				#check whether use is last use instance
+				if curr.data[9] == "-":
+					#free physical register
+					vr2[vr] = "-"
+					pr2[pr] = "-"
+					#add freed register to stack
+					reg_stack.append(pr)
+				
+				#mark next use of physical register in mapping
+				prnu[pr] = curr.data[9] 
+				for vra, pra in vr2.items():
+					prb = vr2[vra]
+					#if pr2[prb] != pra:
+					''''
+					if pr2[pra] != vra:
+						print("3: vr2pr : %s, %s" % (vra, pra))
+						print("3: pr2vr : %s, %s" % (pra, pr2[pra]))
+						print("We have found a MISMATCHED dictionary at : " , curr.data)
+					'''
+			#check whether uses were last uses in regions two and three
+			'''
+			if curr.data[5] == "-" and vr2[curr.data[3]]!= "-":
 				#free physical register
-				vr2[vr] = "-"
-				pr2[pr] = "-"
+				vr2[curr.data[3]] = "-"
+				pr2[curr.data[4]] = "-"
 				#add freed register to stack
 				reg_stack.append(pr)
-			#mark next use of physical register in mapping
-			prnu[pr] = curr.data[13] 
+			if curr.data[9] == "-" and vr2[curr.data[7]]!= "-":
+					#free physical register
+					vr2[curr.data[7]] = "-"
+					pr2[curr.data[8]] = "-"
+					#add freed register to stack
+					reg_stack.append(pr)
+			'''
+			#for last region of source registers
+			if curr.data[1] not in []:
+				vr = curr.data[11]
+				#if pr already  assigned use it
+				if vr2[vr] != "-":
+					pr = vr2[vr]
+					curr.data[12] = pr
+					#sanity check
+					if pr2[pr] != vr:
+						print("equivalency fail 1")
+				#get a pr and restore use value
+				else:
+					#if pr available use it
+					if reg_stack:
+						pr = reg_stack.pop()				
+					#otherwise spill value to attain pr
+					else:
+						#spill value, update ir
+						pr = get_pr(curr, prnu, loc, k, None)
+						#update vr to spillloc dict with previous vr
+						spill_loc[pr2[pr]] = loc
+						#update loc value
+						loc = loc + 4
+
+					curr.data[12] = pr
+					#update prvr mappings
+					#print("vr is: ", vr)
+					vr2[vr] = pr
+					pr2[pr] = vr
+					#print("first Line check")
+					#print("vr2 at 0 :", vr2[0])
+					#print("pr2 at 2 :", pr2[2])
+					#sanity check
+					if pr2[pr] != vr:
+						print("equivalency fail 2a")
+					if vr2[vr] != pr:
+						print("equivalency fail 2b")
+				#check whether use is last use instance
+				'''
+				if curr.data[13] == "-":
+					#free physical register
+					vr2[vr] = "-"
+					pr2[pr] = "-"
+					#add freed register to stack
+					reg_stack.append(pr)
+				'''
+				#sanity check
+				'''
+				if pr2[pr] != vr:
+					print("equivalency fail 3a")
+					print("pr2vr: %s  %s"  % (pr, vr))
+				if vr2[vr] != pr:
+					print("equivalency fail 3b")
+					print("vr2pr: %s  %s"  % (vr, pr))
+				'''
+				#mark next use of physical register in mapping
+				prnu[pr] = curr.data[13] 
+				for vra, pra in vr2.items():
+					prb = vr2[vra]
+					#if pr2[prb] != pra:
+					'''
+					if pr2[pra] != vra:
+						print("3: vr2pr : %s, %s" % (vra, pra))
+						print("3: pr2vr : %s, %s" % (pra, pr2[pra]))
+						print("We have found a MISMATCHED dictionary at : " , curr.data)
+					'''
+		#add check for whether vr and pr dictionaries are equivalent
+		'''
+		for vr, pr in vr2.items():
+			pr0 = vr2[vr]
+			if pr2[pr] != pr0:
+				print("We have found a MISMATCHED dictionary at : " , curr.data)
+		'''
+		
 
 
 		curr = curr.next
@@ -939,10 +1035,19 @@ def allocate_registers(reg, file):
 
 def restore(curr, loc, k, new_pr):
 	'''
+	Inputs:
+	curr- the current data block in front of which operations will be added to IR
+	loc- the location at which the restored information currently exists
+	k- the kth pr in which restored information will be temporarily held
+	new_pr- freed physical register in which the restored value will be loaded
+	
 
 	Effects:
 	Restore the contents of a spilled register to a new physical register, updates intermediate representation
 	'''
+	#print("in restore ir is:" , ir_list.printListContents(ir_list.head) )
+
+
 	#add loadi operation to IR
 	loadI = ["-"] *  14
 	loadI[0] = "restore"
@@ -955,13 +1060,15 @@ def restore(curr, loc, k, new_pr):
 	else:
 		ir_list.insertAfter(curr.prev, loadI)
 
+	#print("restore loadI data array is: " , loadI)
+
 
 	#add load operation to IR
 	
 	load = ["-"] *  14
 	load[0] = "restore"
 	load[1] = "load"
-	load[3] = k
+	load[4] = k
 	load[12] = new_pr
 	load[13] = curr.data[0]
 	if curr.prev == None:
@@ -972,8 +1079,14 @@ def restore(curr, loc, k, new_pr):
 	return
 
 
-def get_pr(curr, prnu, loc, free_pr):
+def get_pr(curr, prnu, loc, free_pr, old_pr):
 	'''
+	Inputs:
+	curr- the current data block in front of which operations will be added to IR
+	prnu- dictionary mapping registers to their next use instance
+	loc- the location at which the restored information currently exists
+	free_pr-freed physical register in which the restored value will be loaded
+	old_pr- the pr previously spilled in the same operation
 
 	Effects:
 	Returns the identifier of a physical register to whose data has been freed for reallocation
@@ -983,7 +1096,7 @@ def get_pr(curr, prnu, loc, free_pr):
 	nu_val = -1
 	pr_val = "-"
 	for pr, nu in prnu.items():
-		if int(nu) > nu_val:
+		if int(nu) > nu_val and pr != old_pr:
 			pr_val = pr
 			nu_val = nu
 	#add loadi operation to IR
@@ -1001,7 +1114,7 @@ def get_pr(curr, prnu, loc, free_pr):
 	store = ["-"] *  14
 	store[0] = "spill"
 	store[1] = "store"
-	store[3] = pr_val
+	store[4] = pr_val
 	store[12] = free_pr
 	if curr.prev == None:
 		ir_list.push(store)
