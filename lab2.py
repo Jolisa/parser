@@ -777,7 +777,7 @@ def rename_registers(file):
 	#ir_list.printListContents(ir_list.head);
 	#print_renamed_registers()
 
-	max_live = 0;
+	#max_live = 0;
 	return max_live, lu, sr
 
 
@@ -1079,6 +1079,7 @@ def allocate_registers(reg, file):
 					print("equivalency fail 2:2b")
 				#mark next use of physical register in mapping
 				prnu[pr] = curr.data[9] 
+			'''
 			
 			#check whether uses were last uses in regions two and three	
 			if curr.data[5] == "-" and vr2[curr.data[3]]!= "-":
@@ -1093,7 +1094,7 @@ def allocate_registers(reg, file):
 				pr2[curr.data[8]] = "-"
 				#add freed register to stack
 				reg_stack.append(curr.data[8])
-			
+			'''
 			
 			#pr1 = pr
 			#for last region store operation
@@ -1179,18 +1180,32 @@ def allocate_registers(reg, file):
 				if vr2[vr] != pr:
 					print("equivalency fail 3:2b")
 					print("vr2pr: %s  %s"  % (vr, pr))
-				#check whether use is last use instance
-				'''
-				if curr.data[13] == "-":
-					#free physical register
-					vr2[vr] = "-"
-					pr2[pr] = "-"
-					#add freed register to stack
-					reg_stack.append(pr)
-				'''
+				
+				
 				#sanity check
 				#mark next use of physical register in mapping
 				prnu[pr] = curr.data[13] 
+
+			#check whether use is last use instance	
+			if curr.data[13] == "-":
+				#free physical register
+				vr2[vr] = "-"
+				pr2[pr] = "-"
+				#add freed register to stack
+				reg_stack.append(pr)
+		#check whether uses were last uses in regions two and three	
+		if curr.data[5] == "-" and vr2[curr.data[3]]!= "-":
+			#free physical register
+			vr2[curr.data[3]] = "-"
+			pr2[curr.data[4]] = "-"
+			#add freed register to stack
+			reg_stack.append(curr.data[4])
+		if curr.data[9] == "-" and vr2[curr.data[7]]!= "-":
+			#free physical register
+			vr2[curr.data[7]] = "-"
+			pr2[curr.data[8]] = "-"
+			#add freed register to stack
+			reg_stack.append(curr.data[8])
 		#add check for whether vr and pr dictionaries are equivalent
 		
 		for vra, pra in vr2.items():
@@ -1230,11 +1245,13 @@ def restore(curr, loc, k, new_pr):
 	loadI[2] = loc
 	loadI[12] = k
 	loadI[13] = curr.data[0]
+	'''
 	if curr.prev == None:
 		ir_list.push(loadI)
 	else:
 		ir_list.insertAfter(curr.prev, loadI)
-
+	'''
+	ir_list.insertAfter(curr.prev, loadI)
 	#print("restore loadI data array is: " , loadI)
 
 
@@ -1246,10 +1263,13 @@ def restore(curr, loc, k, new_pr):
 	load[4] = k
 	load[12] = new_pr
 	load[13] = curr.data[0]
+	'''
 	if curr.prev == None:
 		ir_list.push(load)
 	else:
 		ir_list.insertAfter(curr.prev, load)
+	'''
+	ir_list.insertAfter(curr.prev, load)
 
 	return
 
