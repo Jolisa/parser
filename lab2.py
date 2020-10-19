@@ -894,8 +894,10 @@ def allocate_easy(reg, file):
 					pr = vr2[vr]
 					curr.data[12] = pr
 					#sanity check
+					'''
 					if pr2[pr] != vr:
 						print("equivalency fail 1")
+					'''
 				#get a pr and restore use value
 				else:
 					#if pr available use it
@@ -914,10 +916,12 @@ def allocate_easy(reg, file):
 					#print("vr2 at 0 :", vr2[0])
 					#print("pr2 at 2 :", pr2[2])
 					#sanity check
+					'''
 					if pr2[pr] != vr:
 						print("equivalency fail 2a")
 					if vr2[vr] != pr:
 						print("equivalency fail 2b")
+					'''
 				#check whether use is last use instance
 				'''
 				if curr.data[13] == "-":
@@ -952,6 +956,7 @@ def allocate_registers(reg, file):
 	prnu = defaultdict(def_value)
 	spill_loc = defaultdict(def_value)
 	max_live, lu, sr = rename_registers(file)
+	pr0 = None
 	#print("registers before starting: ")
 	#print_renamed_registers()
 	#finishing testing purposes
@@ -1029,10 +1034,12 @@ def allocate_registers(reg, file):
 				#based on piazza post, commenting this out for a moment
 				vr2[vr] = pr
 				pr2[pr] = vr
+				'''
 				if pr2[pr] != vr:
 					print("equivalency fail 1:2a")
 				if vr2[vr] != pr:
 					print("equivalency fail 1:2b")
+				'''
 				#mark next use of physical register in mapping
 				prnu[pr] = curr.data[5] 		
 			#for second region of source registers
@@ -1045,7 +1052,7 @@ def allocate_registers(reg, file):
 					pr = vr2[vr]
 				#get a pr and restore use value
 				else:
-					pr, spilled = get_pr(reg_stack, curr, prnu, loc, k, pr0)
+					pr, spilled = get_pr(reg_stack, curr, prnu, loc, k, curr.data[4])
 					#update vr to spillloc dict with previous vr
 					if spilled:
 						spill_loc[pr2[pr]] = loc
@@ -1073,10 +1080,11 @@ def allocate_registers(reg, file):
 				#based on piazza post, commenting this out for a moment
 				vr2[vr] = pr
 				pr2[pr] = vr
-				if pr2[pr] != vr:
-					print("equivalency fail 2:2a")
-				if vr2[vr] != pr:
-					print("equivalency fail 2:2b")
+				#if pr2[pr] != vr:
+					#print("equivalency fail 2:2a")
+				#if vr2[vr] != pr:
+					#print("equivalency fail 2:2b")
+				
 				#mark next use of physical register in mapping
 				prnu[pr] = curr.data[9] 
 			'''
@@ -1108,7 +1116,7 @@ def allocate_registers(reg, file):
 					#print("vr2pr: %s  %s"  % (vr, pr))
 				#get a pr and restore use value
 				else:
-					pr, spilled = get_pr(reg_stack, curr, prnu, loc, k, None)
+					pr, spilled = get_pr(reg_stack, curr, prnu, loc, k, curr.data[4])
 					#update vr to spillloc dict with previous vr
 					if spilled:
 						spill_loc[pr2[pr]] = loc
@@ -1136,12 +1144,38 @@ def allocate_registers(reg, file):
 				#based on piazza post, commenting this out for a moment
 				vr2[vr] = pr
 				pr2[pr] = vr
+				'''
 				if pr2[pr] != vr:
 					print("equivalency fail 1:2a")
 				if vr2[vr] != pr:
 					print("equivalency fail 1:2b")
+				'''
 				#mark next use of physical register in mapping
-				prnu[pr] = curr.data[13] 	
+				prnu[pr] = curr.data[13] 
+
+				#check whether use is last use instance	
+				if curr.data[13] == "-":
+					#free physical register
+					vr2[vr] = "-"
+					pr2[pr] = "-"
+					prnu[pr] = "-"
+					#add freed register to stack
+					reg_stack.append(pr)
+			#check whether uses were last uses in regions two and three	
+			if curr.data[5] == "-" and vr2[curr.data[3]]!= "-":
+				#free physical register
+				vr2[curr.data[3]] = "-"
+				pr2[curr.data[4]] = "-"
+				prnu[curr.data[4]] = "-"
+				#add freed register to stack
+				reg_stack.append(curr.data[4])
+			if curr.data[9] == "-" and vr2[curr.data[7]]!= "-":
+				#free physical register
+				vr2[curr.data[7]] = "-"
+				pr2[curr.data[8]] = "-"
+				prnu[curr.data[8]] = "-"
+				#add freed register to stack
+				reg_stack.append(curr.data[8])	
 			
 
 			#for last region of source registers
@@ -1173,6 +1207,7 @@ def allocate_registers(reg, file):
 				#update prvr mappings
 				vr2[vr] = pr
 				pr2[pr] = vr
+				'''
 				if pr2[pr] != vr:
 					print("equivalency fail 3:2a")
 					print("pr2vr: %s  %s"  % (pr, vr))
@@ -1180,6 +1215,7 @@ def allocate_registers(reg, file):
 				if vr2[vr] != pr:
 					print("equivalency fail 3:2b")
 					print("vr2pr: %s  %s"  % (vr, pr))
+				'''
 				
 				
 				#sanity check
@@ -1191,21 +1227,9 @@ def allocate_registers(reg, file):
 				#free physical register
 				vr2[vr] = "-"
 				pr2[pr] = "-"
+				prnu[pr] = "-"
 				#add freed register to stack
 				reg_stack.append(pr)
-		#check whether uses were last uses in regions two and three	
-		if curr.data[5] == "-" and vr2[curr.data[3]]!= "-":
-			#free physical register
-			vr2[curr.data[3]] = "-"
-			pr2[curr.data[4]] = "-"
-			#add freed register to stack
-			reg_stack.append(curr.data[4])
-		if curr.data[9] == "-" and vr2[curr.data[7]]!= "-":
-			#free physical register
-			vr2[curr.data[7]] = "-"
-			pr2[curr.data[8]] = "-"
-			#add freed register to stack
-			reg_stack.append(curr.data[8])
 		#add check for whether vr and pr dictionaries are equivalent
 		
 		for vra, pra in vr2.items():
@@ -1296,11 +1320,16 @@ def get_pr(stack, curr, prnu, loc, free_pr, old_pr):
 	nu_val = -1
 	pr_val = "-"
 	for pr, nu in prnu.items():
-		if nu == "-":
+
+		if nu == "-" and pr != old_pr:
+
 			#print("pr for - nu val was ", pr)
 			pr_val = pr
 			nu_val = nu
 			break
+
+		if nu == "-" :
+			continue
 
 		if int(nu) > nu_val and pr != old_pr :
 			pr_val = pr
