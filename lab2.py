@@ -1058,12 +1058,13 @@ def allocate_registers(reg, file):
 					pr = vr2[vr]
 				#get a pr and restore use value
 				else:
-					pr, spilled = get_pr(reg_stack, curr, prnu, loc, k, None)
+					pr, spilled, spilled_easy = get_pr(reg_stack, curr, prnu, loc, k, None, spill_loc, pr2)
 					#update vr to spillloc dict with previous vr
-					if spilled:
-						spill_loc[pr2[pr]] = loc
-						#update loc value
-						loc = loc + 4
+					if spilled or spilled_easy:
+						if spilled:
+							spill_loc[pr2[pr]] = loc
+							#update loc value
+							loc = loc + 4
 						#update mapping so that spilled vr register maps to no physical register
 						#get old vr and update
 						old_vr = pr2[pr]
@@ -1105,12 +1106,13 @@ def allocate_registers(reg, file):
 					pr = vr2[vr]
 				#get a pr and restore use value
 				else:
-					pr, spilled = get_pr(reg_stack, curr, prnu, loc, k, curr.data[4])
+					pr, spilled, spilled_easy = get_pr(reg_stack, curr, prnu, loc, k, curr.data[4], spill_loc, pr2)
 					#update vr to spillloc dict with previous vr
-					if spilled:
-						spill_loc[pr2[pr]] = loc
-						#update loc value
-						loc = loc + 4
+					if spilled or spilled_easy:
+						if spilled:
+							spill_loc[pr2[pr]] = loc
+							#update loc value
+							loc = loc + 4
 						#update mapping so that spilled vr register maps to no physical register
 						#get old vr and update
 						old_vr = pr2[pr]
@@ -1169,12 +1171,13 @@ def allocate_registers(reg, file):
 					#print("vr2pr: %s  %s"  % (vr, pr))
 				#get a pr and restore use value
 				else:
-					pr, spilled = get_pr(reg_stack, curr, prnu, loc, k, curr.data[4])
+					pr, spilled, spilled_easy = get_pr(reg_stack, curr, prnu, loc, k, curr.data[4], spill_loc, pr2)
 					#update vr to spillloc dict with previous vr
-					if spilled:
-						spill_loc[pr2[pr]] = loc
-						#update loc value
-						loc = loc + 4
+					if spilled or spilled_easy:
+						if spilled:
+							spill_loc[pr2[pr]] = loc
+							#update loc value
+							loc = loc + 4
 						#update mapping so that spilled vr register maps to no physical register
 						#get old vr and update
 						old_vr = pr2[pr]
@@ -1208,6 +1211,8 @@ def allocate_registers(reg, file):
 
 				#check whether use is last use instance	
 				if curr.data[13] == "-":
+					#reset spill dictionary at now free virtual register
+					spill_loc[vr] = "-"
 					#free physical register
 					vr2[vr] = "-"
 					pr2[pr] = "-"
@@ -1216,6 +1221,8 @@ def allocate_registers(reg, file):
 					reg_stack.append(pr)
 			#check whether uses were last uses in regions two and three	
 			if curr.data[5] == "-" and vr2[curr.data[3]]!= "-":
+				#reset spill dictionary at now free virtual register
+				spill_loc[curr.data[3]] = "-"
 				#free physical register
 				vr2[curr.data[3]] = "-"
 				pr2[curr.data[4]] = "-"
@@ -1223,6 +1230,8 @@ def allocate_registers(reg, file):
 				#add freed register to stack
 				reg_stack.append(curr.data[4])
 			if curr.data[9] == "-" and vr2[curr.data[7]]!= "-":
+				#reset spill dictionary at now free virtual register
+				spill_loc[curr.data[7]] = "-"
 				#free physical register
 				vr2[curr.data[7]] = "-"
 				pr2[curr.data[8]] = "-"
@@ -1235,12 +1244,13 @@ def allocate_registers(reg, file):
 			if curr.data[1] not in ["store"]:
 				vr = curr.data[11]
 				
-				pr, spilled = get_pr(reg_stack, curr, prnu, loc, k, None)
+				pr, spilled, spilled_easy = get_pr(reg_stack, curr, prnu, loc, k, None, spill_loc, pr2)
 				#update vr to spillloc dict with previous vr
-				if spilled:
-					spill_loc[pr2[pr]] = loc
-					#update loc value
-					loc = loc + 4
+				if spilled or spilled_easy:
+					if spilled:
+						spill_loc[pr2[pr]] = loc
+						#update loc value
+						loc = loc + 4
 					#update mapping so that spilled vr register maps to no physical register
 					#get old vr and update
 					old_vr = pr2[pr]
@@ -1277,6 +1287,8 @@ def allocate_registers(reg, file):
 
 			#check whether use is last use instance	
 			if curr.data[13] == "-":
+				#reset spill dictionary at now free virtual register
+				spill_loc[pr2[pr]] = "-"
 				#free physical register
 				vr2[vr] = "-"
 				pr2[pr] = "-"
@@ -1351,7 +1363,7 @@ def restore(curr, loc, k, new_pr):
 	return
 
 
-def get_pr(stack, curr, prnu, loc, free_pr, old_pr):
+def get_pr(stack, curr, prnu, loc, free_pr, old_pr, spill_loc, pr2):
 	'''
 	Inputs:
 	stack- empty or nonempty stack containing available registers
@@ -1368,7 +1380,7 @@ def get_pr(stack, curr, prnu, loc, free_pr, old_pr):
 
 	if stack:
 		#print("pr from stack is: " , stack[-1])
-		return stack[-1], False
+		return stack[-1], False, False
 
 	nu_val = -1
 	pr_val = "-"
@@ -1389,6 +1401,16 @@ def get_pr(stack, curr, prnu, loc, free_pr, old_pr):
 		if nu > nu_val and pr != old_pr :
 			pr_val = pr
 			nu_val = nu
+
+	#optimization - if the code has been previously spilled, it does not need code reinserted
+	vr = pr2[pr_val]
+	if spill_loc[vr] != "-":
+		return pr_val, False, True
+
+	#if the evicted register is loadI - no code required to spill
+	
+
+
 	#add loadi operation to IR
 	loadI = ["-"] *  14
 	loadI[0] = "spill"
@@ -1414,7 +1436,7 @@ def get_pr(stack, curr, prnu, loc, free_pr, old_pr):
 
 
 
-	return pr_val, True
+	return pr_val, True, False
 
 def print_reallocated_registers():
 	'''
