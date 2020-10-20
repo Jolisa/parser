@@ -2,6 +2,7 @@
 import argparse
 from optparse import OptionParser
 import sys
+import time
 from collections import defaultdict 
 
 
@@ -94,7 +95,7 @@ class DoubleLinkedList:
 		return
 
 
-ir_list = DoubleLinkedList() 
+
 
 
 
@@ -220,9 +221,16 @@ def finish_loadi(line, line_num, opcode, ir=False):
 
 			break
 	#print ir representation
+	'''
 	if ir and not errors:
 		#print(" %s  [ val %d ], [ ], [ sr%d ]" % (loadi_list[1], loadi_list[2], loadi_list[10]))
 		ir_list.appendNode(loadi_list)
+	if ir and errors:
+		print("Due to syntax errors, run terminates.")
+	'''
+	if ir and not errors:
+		#print(" %s  [ val %d ], [ ], [ sr%d ]" % (loadi_list[1], loadi_list[2], loadi_list[10]))
+		return loadi_list
 	if ir and errors:
 		print("Due to syntax errors, run terminates.")
 
@@ -316,10 +324,16 @@ def finish_memop(line, line_num, opcode, ir=False):
 					errors = True
 
 			break
+	'''
 	#print ir representation
 	if ir and not errors:
 		#print(" %s [ sr%d ], [ ], [ sr%d ]" % (memop_list[1], memop_list[2], memop_list[10]))
 		ir_list.appendNode(memop_list)
+	if ir and errors:
+		print("Due to syntax errors, run terminates.")
+	'''
+	if ir and not errors:
+		return memop_list
 	if ir and errors:
 		print("Due to syntax errors, run terminates.")
 
@@ -441,10 +455,18 @@ def finish_arithop(line, line_num, opcode, ir=False):
 
 			break
 
+	'''
 	#print ir representation
 	if ir and not errors:
 		#print(" %s [ sr%d ], [ sr%d ], [ sr%d ]" % (arithop_list[1], arithop_list[2], arithop_list[6], arithop_list[10]))
 		ir_list.appendNode(arithop_list)
+	if ir and errors:
+		print("Due to syntax errors, run terminates.")
+	'''
+
+	#print ir representation
+	if ir and not errors:
+		return arithop_list
 	if ir and errors:
 		print("Due to syntax errors, run terminates.")
 	return
@@ -503,10 +525,17 @@ def finish_output(line, line_num, opcode, ir=False):
 					errors = True
 
 			break
+	'''
 	#print ir representation
 	if ir and not errors:
 		#print(" %s [ val %d ], [ ], [ ]" % (output_list[1], output_list[2]))
 		ir_list.appendNode(output_list)
+
+	if ir and errors:
+		print("Due to syntax errors, run terminates.")
+	'''
+	if ir and not errors:
+		return output_list
 
 	if ir and errors:
 		print("Due to syntax errors, run terminates.")
@@ -544,10 +573,16 @@ def finish_nop(line, line_num, opcode, ir=False):
 				sys.stderr.write("%d: Excessive lexemes in nop. \n" % line_num) 
 				errors = True
 				break
+	'''
 	#print ir representation
 	if ir and not errors:
 		#print(" %s [ ], [ ], [ ]" % nop_list[1])
 		ir_list.appendNode(nop_list)
+	if ir and errors:
+		print("Due to syntax errors, run terminates.")
+	'''
+	if ir and not errors:
+		return nop_list
 	if ir and errors:
 		print("Due to syntax errors, run terminates.")
 	
@@ -630,7 +665,9 @@ def create_ir(file):
 	Effects:
 	Prints out parsing details, including errors and line number for error if parsing is unsuccessful
 	'''
+	start = time.time()
 	line_num = 1
+	ir_list = DoubleLinkedList() 
 
 	while 1: 
 		
@@ -672,18 +709,19 @@ def create_ir(file):
 					#parse the rest of the line respective to first lexeme
 					if lexeme < 10:
 						if lexeme == 0:
-							finish_loadi(line[str_index:], line_num, token, ir=True)
+							op_list = finish_loadi(line[str_index:], line_num, token, ir=True)
 						elif lexeme < 3:
-							finish_memop(line[str_index:], line_num, token, ir=True)
+							op_list = finish_memop(line[str_index:], line_num, token, ir=True)
 						elif lexeme < 8:
-							finish_arithop(line[str_index:], line_num, token, ir=True)
+							op_list = finish_arithop(line[str_index:], line_num, token, ir=True)
 						elif lexeme == 8:
-							finish_output(line[str_index:], line_num, token, ir=True)
+							op_list = finish_output(line[str_index:], line_num, token, ir=True)
 						elif lexeme == 9:
-							finish_nop(line[str_index:], line_num, token, ir=True)
+							op_list = finish_nop(line[str_index:], line_num, token, ir=True)
 						#exit and return error if the first lexeme is not appropriate for the grammar
 						else:
 							sys.stderr.write("%d: ILOC sentence must begin with a LOADI, MEMOP, ARITHOP, OUTPUT, or NOP lexeme. Operation starts with an invalid opcode. \n" % line_num)
+						ir_list.appendNode(op_list)
 					#evaluate the rest of the line in the appropriate subfunction
 					break
 
@@ -693,8 +731,11 @@ def create_ir(file):
 			line_num += 1
 					
 	#ir_list.printListContents(ir_list.head) 
-
-	return
+	stop = time.time()
+	print("Create intermediate representation took this many seconds: " , stop - start)
+	
+	print("finished renaming")
+	return ir_list
 def def_value(): 
 	return "-"
 
@@ -708,7 +749,8 @@ def rename_registers(file):
 	Prints out the original file with source registers reassigned to virtual registers
 	'''
 	#sr_to_vr dict
-	create_ir(file)
+	start = time.time()
+	ir_list = create_ir(file)
 	sr= defaultdict(def_value)
 	lu = defaultdict(def_value)
 	vr = 0
@@ -717,6 +759,8 @@ def rename_registers(file):
 
 
 	curr = ir_list.last
+	stop = time.time()
+	print("Renaming checkpoint 1 took this many seconds: " , stop - start)
 	
 	while (curr != None) :
 		
@@ -791,21 +835,21 @@ def rename_registers(file):
 				lu[curr.data[6]] = curr.data[0]
 		#print("live amount at end of op line %s is: %d ", (curr.data[0], curr.data[1], live))
 		curr = curr.prev
-	#print("max live was " , max_live)
-	#ir_list.printListContents(ir_list.head);
-	#print_renamed_registers()
+	
+	stop = time.time()
+	print("Renaming took this many seconds: " , stop - start)
+	
+	print("finished renaming")
+	return max_live, lu, sr, ir_list
 
-	#max_live = 0;
 
-	return max_live, lu, sr
-
-
-def allocate_easy(reg, file, max_live, lu, sr):
+def allocate_easy(reg, file, max_live, lu, sr, ir_list):
 
 	reg_stack = []
 	
 	#max_live, lu, sr = rename_registers(file)
 	#print("we are in allocate easy")
+	start = time.time()
 	
 	
 		
@@ -1004,7 +1048,11 @@ def allocate_easy(reg, file, max_live, lu, sr):
 	#print("this is the final ir allowing for physical register placement")
 	#ir_list.printListContents(ir_list.head)
 
-	print_reallocated_registers()      
+	print_reallocated_registers(ir_list) 
+	stop = time.time()
+	print("Easy Allocation took this many seconds: " , stop - start)
+	
+	print("finished easy allocation")     
 	return 
 
 
@@ -1012,14 +1060,16 @@ def allocate_registers(reg, file):
 	
 	reg_stack = []
 	
-	max_live, lu, sr = rename_registers(file)
+	
+	max_live, lu, sr, ir_list = rename_registers(file)
+	start = time.time()
 	#print("max live is: ", max_live)
 	#print("number of registers is: ", reg)
 	#print(int(reg) > int(max_live))
 	reg = int(reg)
 	#if enough registers are available, spilling is not neccesary ever, switch cases
 	if reg > max_live:
-		return allocate_easy(reg, file, max_live, lu, sr)
+		return allocate_easy(reg, file, max_live, lu, sr, ir_list)
 		
 	
 	#dict of next uses for registers (perhaps redundant, could be more efficient) 
@@ -1058,13 +1108,19 @@ def allocate_registers(reg, file):
 					pr = vr2[vr]
 				#get a pr and restore use value
 				else:
-					pr, spilled, spilled_easy = get_pr(reg_stack, curr, prnu, loc, k, None, spill_loc, pr2)
+					pr, spilled, spilled_easy, loadI, store = get_pr(reg_stack, curr, prnu, loc, k, None, spill_loc, pr2)
 					#update vr to spillloc dict with previous vr
 					if spilled or spilled_easy:
 						if spilled:
 							spill_loc[pr2[pr]] = loc
 							#update loc value
 							loc = loc + 4
+							#update ir
+							if curr.prev == None:
+								ir_list.push(loadI)
+							else:
+								ir_list.insertAfter(curr.prev, loadI)
+							ir_list.insertAfter(curr.prev, store)
 						#update mapping so that spilled vr register maps to no physical register
 						#get old vr and update
 						old_vr = pr2[pr]
@@ -1081,7 +1137,12 @@ def allocate_registers(reg, file):
 
 					#restore use value
 					#print("restoring at register 1")
-					restore(curr, spill_loc[vr], k, pr)	
+					loadI, load = restore(curr, spill_loc[vr], k, pr, ir_list)	
+					if curr.prev == None:
+						ir_list.push(loadI)
+					else:
+						ir_list.insertAfter(curr.prev, loadI)
+					ir_list.insertAfter(curr.prev, load)
 				#update pr in intermediate representation
 				curr.data[4] = pr
 				#update prvr mappings
@@ -1106,13 +1167,19 @@ def allocate_registers(reg, file):
 					pr = vr2[vr]
 				#get a pr and restore use value
 				else:
-					pr, spilled, spilled_easy = get_pr(reg_stack, curr, prnu, loc, k, curr.data[4], spill_loc, pr2)
+					pr, spilled, spilled_easy, loadI, store = get_pr(reg_stack, curr, prnu, loc, k, curr.data[4], spill_loc, pr2)
 					#update vr to spillloc dict with previous vr
 					if spilled or spilled_easy:
 						if spilled:
 							spill_loc[pr2[pr]] = loc
 							#update loc value
 							loc = loc + 4
+							#update ir
+							if curr.prev == None:
+								ir_list.push(loadI)
+							else:
+								ir_list.insertAfter(curr.prev, loadI)
+							ir_list.insertAfter(curr.prev, store)
 						#update mapping so that spilled vr register maps to no physical register
 						#get old vr and update
 						old_vr = pr2[pr]
@@ -1128,7 +1195,12 @@ def allocate_registers(reg, file):
 
 					#restore use value
 					#print("restoring at register 2")
-					restore(curr, spill_loc[vr], k, pr)	
+					loadI, load = restore(curr, spill_loc[vr], k, pr, ir_list)
+					if curr.prev == None:
+						ir_list.push(loadI)
+					else:
+						ir_list.insertAfter(curr.prev, loadI)
+					ir_list.insertAfter(curr.prev, load)	
 				#update pr in intermediate representation
 				curr.data[8] = pr
 				#update prvr mappings
@@ -1171,13 +1243,20 @@ def allocate_registers(reg, file):
 					#print("vr2pr: %s  %s"  % (vr, pr))
 				#get a pr and restore use value
 				else:
-					pr, spilled, spilled_easy = get_pr(reg_stack, curr, prnu, loc, k, curr.data[4], spill_loc, pr2)
+					pr, spilled, spilled_easy, loadI, store  = get_pr(reg_stack, curr, prnu, loc, k, curr.data[4], spill_loc, pr2)
 					#update vr to spillloc dict with previous vr
 					if spilled or spilled_easy:
 						if spilled:
 							spill_loc[pr2[pr]] = loc
 							#update loc value
 							loc = loc + 4
+							#update ir
+							if curr.prev == None:
+								ir_list.push(loadI)
+							else:
+								ir_list.insertAfter(curr.prev, loadI)
+							ir_list.insertAfter(curr.prev, store)
+
 						#update mapping so that spilled vr register maps to no physical register
 						#get old vr and update
 						old_vr = pr2[pr]
@@ -1193,7 +1272,12 @@ def allocate_registers(reg, file):
 
 					#restore use value
 					#print("restoring at store")
-					restore(curr, spill_loc[vr], k, pr)	
+					loadI, load = restore(curr, spill_loc[vr], k, pr, ir_list)	
+					if curr.prev == None:
+						ir_list.push(loadI)
+					else:
+						ir_list.insertAfter(curr.prev, loadI)
+					ir_list.insertAfter(curr.prev, load)
 				#update pr in intermediate representation
 				curr.data[12] = pr
 				#update prvr mappings
@@ -1212,7 +1296,7 @@ def allocate_registers(reg, file):
 				#check whether use is last use instance	
 				if curr.data[13] == "-":
 					#reset spill dictionary at now free virtual register
-					spill_loc[vr] = "-"
+					#spill_loc[vr] = "-"
 					#free physical register
 					vr2[vr] = "-"
 					pr2[pr] = "-"
@@ -1222,7 +1306,7 @@ def allocate_registers(reg, file):
 			#check whether uses were last uses in regions two and three	
 			if curr.data[5] == "-" and vr2[curr.data[3]]!= "-":
 				#reset spill dictionary at now free virtual register
-				spill_loc[curr.data[3]] = "-"
+				#spill_loc[curr.data[3]] = "-"
 				#free physical register
 				vr2[curr.data[3]] = "-"
 				pr2[curr.data[4]] = "-"
@@ -1231,7 +1315,7 @@ def allocate_registers(reg, file):
 				reg_stack.append(curr.data[4])
 			if curr.data[9] == "-" and vr2[curr.data[7]]!= "-":
 				#reset spill dictionary at now free virtual register
-				spill_loc[curr.data[7]] = "-"
+				#spill_loc[curr.data[7]] = "-"
 				#free physical register
 				vr2[curr.data[7]] = "-"
 				pr2[curr.data[8]] = "-"
@@ -1244,13 +1328,19 @@ def allocate_registers(reg, file):
 			if curr.data[1] not in ["store"]:
 				vr = curr.data[11]
 				
-				pr, spilled, spilled_easy = get_pr(reg_stack, curr, prnu, loc, k, None, spill_loc, pr2)
+				pr, spilled, spilled_easy, loadI, store = get_pr(reg_stack, curr, prnu, loc, k, None, spill_loc, pr2)
 				#update vr to spillloc dict with previous vr
 				if spilled or spilled_easy:
 					if spilled:
 						spill_loc[pr2[pr]] = loc
 						#update loc value
 						loc = loc + 4
+						#update ir
+						if curr.prev == None:
+							ir_list.push(loadI)
+						else:
+							ir_list.insertAfter(curr.prev, loadI)
+						ir_list.insertAfter(curr.prev, store)
 					#update mapping so that spilled vr register maps to no physical register
 					#get old vr and update
 					old_vr = pr2[pr]
@@ -1288,7 +1378,7 @@ def allocate_registers(reg, file):
 			#check whether use is last use instance	
 			if curr.data[13] == "-":
 				#reset spill dictionary at now free virtual register
-				spill_loc[pr2[pr]] = "-"
+				#spill_loc[pr2[pr]] = "-"
 				#free physical register
 				vr2[vr] = "-"
 				pr2[pr] = "-"
@@ -1309,10 +1399,13 @@ def allocate_registers(reg, file):
 	#print("this is the final ir allowing for physical register placement")
 	#ir_list.printListContents(ir_list.head)
 
-	print_reallocated_registers()      
+	print_reallocated_registers(ir_list)  
+	stop = time.time()
+	print("Allocation took this many seconds: " , stop - start)
+	print("finished allocation")    
 	return 
 
-def restore(curr, loc, k, new_pr):
+def restore(curr, loc, k, new_pr, ir_list):
 	'''
 	Inputs:
 	curr- the current data block in front of which operations will be added to IR
@@ -1322,7 +1415,7 @@ def restore(curr, loc, k, new_pr):
 	
 
 	Effects:
-	Restore the contents of a spilled register to a new physical register, updates intermediate representation
+	Restore the contents of a spilled register to a provided new physical register, updates intermediate representation
 	'''
 	#print("in restore ir is:" , ir_list.printListContents(ir_list.head) )
 
@@ -1340,9 +1433,14 @@ def restore(curr, loc, k, new_pr):
 	else:
 		ir_list.insertAfter(curr.prev, loadI)
 	'''
-	ir_list.insertAfter(curr.prev, loadI)
+	#ir_list.insertAfter(curr.prev, loadI)
 	#print("restore loadI data array is: " , loadI)
-
+	'''
+	if curr.data[1] == "loadI":
+		return ??
+	if loc2op[loc] == "loadI":
+		return
+	'''
 
 	#add load operation to IR
 	
@@ -1358,9 +1456,9 @@ def restore(curr, loc, k, new_pr):
 	else:
 		ir_list.insertAfter(curr.prev, load)
 	'''
-	ir_list.insertAfter(curr.prev, load)
+	#ir_list.insertAfter(curr.prev, load)
 
-	return
+	return loadI, load
 
 
 def get_pr(stack, curr, prnu, loc, free_pr, old_pr, spill_loc, pr2):
@@ -1374,13 +1472,13 @@ def get_pr(stack, curr, prnu, loc, free_pr, old_pr, spill_loc, pr2):
 	old_pr- the pr previously spilled in the same operation
 
 	Effects:
-	Returns the identifier of a physical register to whose data has been freed for reallocation
+	Returns the identifier of a physical register whose data has been freed for reallocation if neccesary
 	'''
 	#TODOOOOO, can be optimized for loadi operation
 
 	if stack:
 		#print("pr from stack is: " , stack[-1])
-		return stack[-1], False, False
+		return stack[-1], False, False, None, None
 
 	nu_val = -1
 	pr_val = "-"
@@ -1405,9 +1503,14 @@ def get_pr(stack, curr, prnu, loc, free_pr, old_pr, spill_loc, pr2):
 	#optimization - if the code has been previously spilled, it does not need code reinserted
 	vr = pr2[pr_val]
 	if spill_loc[vr] != "-":
-		return pr_val, False, True
+		#print("we used the extra case")
+		return pr_val, False, True, None, None
 
 	#if the evicted register is loadI - no code required to spill
+	'''
+	if vr2op[vr] == "load":
+		return pr_val, False, False
+	'''
 	
 
 
@@ -1417,10 +1520,12 @@ def get_pr(stack, curr, prnu, loc, free_pr, old_pr, spill_loc, pr2):
 	loadI[1] = "loadI"
 	loadI[2] = loc
 	loadI[12] = free_pr
+	'''
 	if curr.prev == None:
 		ir_list.push(loadI)
 	else:
 		ir_list.insertAfter(curr.prev, loadI)
+	'''
 
 	#add store operation to IR
 	store = ["-"] *  14
@@ -1428,17 +1533,18 @@ def get_pr(stack, curr, prnu, loc, free_pr, old_pr, spill_loc, pr2):
 	store[1] = "store"
 	store[4] = pr_val
 	store[12] = free_pr
+	'''
 	if curr.prev == None:
 		ir_list.push(store)
 	else:
 		ir_list.insertAfter(curr.prev, store)
+	'''
 
 
 
+	return pr_val, True, False, loadI, store
 
-	return pr_val, True, False
-
-def print_reallocated_registers():
+def print_reallocated_registers(ir_list):
 	'''
 
 	Effects:
@@ -1832,6 +1938,8 @@ def main():
 	elif read:
 		#print intermediate representation
 		create_ir(file)
+	elif parse:
+		parse_file(file)
 	elif rename:
 		#print intermediate representation
 		rename_registers(file)
