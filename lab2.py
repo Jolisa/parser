@@ -139,6 +139,9 @@ def finish_loadi(line, line_num, opcode, ir=False):
 	# index 2 = constant
 	#index  10= target register
 	loadi_list = ["-"] * 14
+	loadi_list[5] = float("inf")
+	loadi_list[9] = float("inf")
+	loadi_list[13] = float("inf")
 	errors = True;
 	loadi_list[0] = line_num
 	loadi_list[1] = "loadI"
@@ -231,6 +234,9 @@ def finish_memop(line, line_num, opcode, ir=False):
 	#index  10= target register
 
 	memop_list = ["-"] * 14
+	memop_list[5] = float("inf")
+	memop_list[9] = float("inf")
+	memop_list[13] = float("inf")
 	errors = True;
 	memop_list[0] = line_num
 	memop_list[1] = opcode
@@ -325,6 +331,9 @@ def finish_arithop(line, line_num, opcode, ir=False):
 	# index 6 = second source register
 	#index  10= target register
 	arithop_list = ["-"] * 14
+	arithop_list[5] = float("inf")
+	arithop_list[9] = float("inf")
+	arithop_list[13] = float("inf")
 	errors = True;
 	arithop_list[0] = line_num
 	arithop_list[1] = opcode
@@ -444,6 +453,9 @@ def finish_output(line, line_num, opcode, ir=False):
 	# index 1 = opcode
 	# index 2 = constant
 	output_list = ["-"] * 14
+	output_list[5] = float("inf")
+	output_list[9] = float("inf")
+	output_list[13] = float("inf")
 	errors = True;
 	output_list[0] = line_num
 	output_list[1] = opcode
@@ -504,6 +516,9 @@ def finish_nop(line, line_num, opcode, ir=False):
 	# index 1 = opcode
 	# index 2 = constant
 	nop_list = ["-"] * 14
+	nop_list[5] = float("inf")
+	nop_list[9] = float("inf")
+	nop_list[13] = float("inf")
 	errors = False;
 	nop_list[0] = line_num
 	nop_list[1] = opcode
@@ -684,7 +699,7 @@ def def_value():
 	return "-"
 
 def def_int(): 
-	return "-"
+	return float('inf')
 
 def rename_registers(file):
 	'''
@@ -785,11 +800,11 @@ def rename_registers(file):
 	return max_live, lu, sr
 
 
-def allocate_easy(reg, file):
+def allocate_easy(reg, file, max_live, lu, sr):
 
 	reg_stack = []
 	
-	max_live, lu, sr = rename_registers(file)
+	#max_live, lu, sr = rename_registers(file)
 	#print("we are in allocate easy")
 	
 	
@@ -1004,11 +1019,11 @@ def allocate_registers(reg, file):
 	reg = int(reg)
 	#if enough registers are available, spilling is not neccesary ever, switch cases
 	if reg > max_live:
-		return allocate_easy(reg, file)
+		return allocate_easy(reg, file, max_live, lu, sr)
 		
 	
 	#dict of next uses for registers (perhaps redundant, could be more efficient) 
-	prnu = defaultdict(def_value)
+	prnu = defaultdict(def_int)
 	spill_loc = defaultdict(def_value)
 	
 	#vr should be initialized to be inverse of sr dict
@@ -1196,7 +1211,7 @@ def allocate_registers(reg, file):
 					#free physical register
 					vr2[vr] = "-"
 					pr2[pr] = "-"
-					prnu[pr] = "-"
+					prnu[pr] = float('inf')
 					#add freed register to stack
 					reg_stack.append(pr)
 			#check whether uses were last uses in regions two and three	
@@ -1204,14 +1219,14 @@ def allocate_registers(reg, file):
 				#free physical register
 				vr2[curr.data[3]] = "-"
 				pr2[curr.data[4]] = "-"
-				prnu[curr.data[4]] = "-"
+				prnu[curr.data[4]] = float('inf')
 				#add freed register to stack
 				reg_stack.append(curr.data[4])
 			if curr.data[9] == "-" and vr2[curr.data[7]]!= "-":
 				#free physical register
 				vr2[curr.data[7]] = "-"
 				pr2[curr.data[8]] = "-"
-				prnu[curr.data[8]] = "-"
+				prnu[curr.data[8]] = float('inf')
 				#add freed register to stack
 				reg_stack.append(curr.data[8])	
 			
@@ -1265,7 +1280,7 @@ def allocate_registers(reg, file):
 				#free physical register
 				vr2[vr] = "-"
 				pr2[pr] = "-"
-				prnu[pr] = "-"
+				prnu[pr] = float('inf')
 				#add freed register to stack
 				reg_stack.append(pr)
 		#add check for whether vr and pr dictionaries are equivalent
@@ -1359,7 +1374,7 @@ def get_pr(stack, curr, prnu, loc, free_pr, old_pr):
 	pr_val = "-"
 	#print("we had to use prnu to get a register")
 	for pr, nu in prnu.items():
-
+		'''
 		if nu == "-" and pr != old_pr:
 
 			#print("pr for - nu val was ", pr)
@@ -1369,8 +1384,9 @@ def get_pr(stack, curr, prnu, loc, free_pr, old_pr):
 
 		if nu == "-" :
 			continue
+		'''
 
-		if int(nu) > nu_val and pr != old_pr :
+		if nu > nu_val and pr != old_pr :
 			pr_val = pr
 			nu_val = nu
 	#add loadi operation to IR
