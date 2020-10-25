@@ -1092,8 +1092,20 @@ def allocate_registers(reg, file):
 				
 
 					#restore use value
-					#print("restoring at register 1")
-					restore(curr, spill_loc[vr][0], k, pr)	
+					if spill_loc[curr.data[3]][1] != "-":
+						#add loadi operation to IR directly if value being restored was originally constructed in a loadI op
+						#rematerialization
+						loadI = ["-"] *  14
+						loadI[0] = "restore"
+						loadI[1] = "loadI"
+						loadI[2] = spill_loc[curr.data[3]][0]
+						loadI[12] = pr
+						loadI[13] = curr.data[0]
+						#print("loadI rematerialization")
+						ir_list.insertAfter(curr.prev, loadI)
+					else:
+						#otherwise use standard protocol to restore value
+						restore(curr, spill_loc[vr][0], k, pr)	
 				#update pr in intermediate representation
 				curr.data[4] = pr
 				#update prvr mappings
@@ -1139,9 +1151,22 @@ def allocate_registers(reg, file):
 						#this update is maybe redundant but just to be safe:
 						pr2[pr] = "-"
 
+					
 					#restore use value
-					#print("restoring at register 2")
-					restore(curr, spill_loc[vr][0], k, pr)	
+					if spill_loc[curr.data[7]][1] != "-":
+						#add loadi operation to IR directly if value being restored was originally constructed in a loadI op
+						#rematerialization
+						loadI = ["-"] *  14
+						loadI[0] = "restore"
+						loadI[1] = "loadI"
+						loadI[2] = spill_loc[curr.data[7]][0]
+						loadI[12] = pr
+						loadI[13] = curr.data[0]
+						#print("loadI rematerialization")
+						ir_list.insertAfter(curr.prev, loadI)
+					else:
+						#otherwise use standard protocol to restore value
+						restore(curr, spill_loc[vr][0], k, pr)
 				#update pr in intermediate representation
 				curr.data[8] = pr
 				#update prvr mappings
@@ -1206,9 +1231,21 @@ def allocate_registers(reg, file):
 						pr2[pr] = "-"
 					
 
-					#restore use value
-					#print("restoring at store")
-					restore(curr, spill_loc[vr][0], k, pr)	
+					#restore use value for virtual register
+					if spill_loc[curr.data[11]][1] != "-":
+						#add loadi operation to IR directly if value being restored was originally constructed in a loadI op
+						#rematerialization
+						loadI = ["-"] *  14
+						loadI[0] = "restore"
+						loadI[1] = "loadI"
+						loadI[2] = spill_loc[curr.data[11]][0] 
+						loadI[12] = pr
+						loadI[13] = curr.data[0]
+						#print("loadI rematerialization")
+						ir_list.insertAfter(curr.prev, loadI)
+					else:
+						#otherwise use standard protocol to restore value
+						restore(curr, spill_loc[vr][0], k, pr)	
 				#update pr in intermediate representation
 				curr.data[12] = pr
 				#update prvr mappings
@@ -1256,7 +1293,8 @@ def allocate_registers(reg, file):
 			
 
 			#for last region of source registers
-			if curr.data[1] not in ["store"]:
+			if curr.data[1] != "store":
+
 				vr = curr.data[11]
 				if reg_stack: 
 						pr = reg_stack[-1]
@@ -1296,10 +1334,19 @@ def allocate_registers(reg, file):
 					print("vr2pr: %s  %s"  % (vr, pr))
 				'''
 				
-				
-				#sanity check
 				#mark next use of physical register in mapping
 				prnu[pr] = curr.data[13] 
+
+				#to set up rematerializable values, add constants for loadI ops to spill dictionary
+				
+				if curr.data[1] == "loadI":
+					#print("going into the spill dictionary is line: ", curr.data[0])
+					spill_loc[vr] = [curr.data[2], "remat"]
+					#print("spill location at vr %d is : " % vr, [curr.data[2], "remat"])
+					#update loc value
+					loc = loc + 4
+				
+
 
 			#check whether use is last use instance	
 			'''
@@ -1351,12 +1398,7 @@ def restore(curr, loc, k, new_pr):
 	loadI[2] = loc
 	loadI[12] = k
 	loadI[13] = curr.data[0]
-	'''
-	if curr.prev == None:
-		ir_list.push(loadI)
-	else:
-		ir_list.insertAfter(curr.prev, loadI)
-	'''
+	
 	ir_list.insertAfter(curr.prev, loadI)
 	#print("restore loadI data array is: " , loadI)
 
@@ -1369,12 +1411,7 @@ def restore(curr, loc, k, new_pr):
 	load[4] = k
 	load[12] = new_pr
 	load[13] = curr.data[0]
-	'''
-	if curr.prev == None:
-		ir_list.push(load)
-	else:
-		ir_list.insertAfter(curr.prev, load)
-	'''
+	
 	ir_list.insertAfter(curr.prev, load)
 
 	return
