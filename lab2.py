@@ -587,6 +587,7 @@ def finish_nop(line, line_num, opcode, ir=False):
 				break
 	#print ir representation
 	if ir and not errors:
+		return 
 		#print(" %s [ ], [ ], [ ]" % nop_list[1])
 		ir_list.appendNode(nop_list)
 	if ir and errors:
@@ -721,6 +722,7 @@ def create_ir(file):
 						elif lexeme == 8:
 							finish_output(line[str_index:], line_num, token, ir=True)
 						elif lexeme == 9:
+							#we will ignore this operation in the end
 							finish_nop(line[str_index:], line_num, token, ir=True)
 						#exit and return error if the first lexeme is not appropriate for the grammar
 						else:
@@ -931,23 +933,7 @@ def allocate_easy(reg, file, max_live, lu, sr):
 					#print("equivalency fail 2:2a")
 				#if vr2[vr] != pr:
 					#print("equivalency fail 2:2b")
-				
-			'''
-			
-			#check whether uses were last uses in regions two and three	
-			if curr.data[5] == "-" and vr2[curr.data[3]]!= "-":
-				#free physical register
-				vr2[curr.data[3]] = "-"
-				pr2[curr.data[4]] = "-"
-				#add freed register to stack
-				reg_stack.append(curr.data[4])
-			if curr.data[9] == "-" and vr2[curr.data[7]]!= "-":
-				#free physical register
-				vr2[curr.data[7]] = "-"
-				pr2[curr.data[8]] = "-"
-				#add freed register to stack
-				reg_stack.append(curr.data[8])
-			'''
+		
 			
 			#pr1 = pr
 			#for last region store operation
@@ -1059,7 +1045,7 @@ def allocate_easy(reg, file, max_live, lu, sr):
 def allocate_registers(reg, file):
 	
 	reg_stack = []
-	ir_list.printListContents(ir_list.head)
+	
 
 	
 	max_live, lu, sr = rename_registers(file)
@@ -1067,6 +1053,7 @@ def allocate_registers(reg, file):
 	#print("number of registers is: ", reg)
 	#print(int(reg) > int(max_live))
 
+	#ir_list.printListContents(ir_list.head)
 
 	reg = int(reg)
 	
@@ -1446,7 +1433,6 @@ def allocate_registers(reg, file):
 	
 	
 	
-	#ir_list.printListContents(ir_list.head)
 	print_reallocated_registers()      
 	return 
 
@@ -1463,6 +1449,20 @@ def restore(curr, loc, k, new_pr):
 	'''
 	#print("in restore ir is:" , ir_list.printListContents(ir_list.head) )
 
+
+	#if memory location = "-", then the register was not previously defined
+	if loc == "-" :
+		#throw error
+		
+		loadI = ["-"] *  14
+		loadI[0] = "restore - previously undefined"
+		loadI[1] = "loadI"
+		loadI[2] = 0
+		loadI[12] = new_pr
+		loadI[13] = curr.data[0]
+		
+		sys.stderr.write("ERROR: %d: Definition of source register attempts to access a previously undefined use. \n" % curr.data[0])
+		
 
 	#add loadi operation to IR
 	loadI = ["-"] *  14
@@ -1709,6 +1709,9 @@ def scan_for_parser(line_num, line, sar):
 					return 16, str_index, line[str_index]
 				str_index += 1
 			lexeme_found = True
+			#skip nop operations
+			
+								
 			return sar, str_index, syntax_array[sar]
 			break
 		else:
@@ -1724,7 +1727,17 @@ def scan_for_parser(line_num, line, sar):
 			#ensure r is followed by at least one digit
 			if line[str_index] in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
 				str_index += 1
+				
+				#print("line at string index + 1 was: ", line[str_index + 1])
+				#print("line at string index + 2 was: ", line[str_index + 2])
 				while (1):
+					if str_index > len(line) - 1:
+						return 12, str_index, line[strt_str_index: str_index]
+						break
+					if line[str_index] == "\n" or line[str_index] == "\r\n":
+						#if we reach the end of the line without a newline for some strange reason...end of file case
+						return 12, str_index, line[strt_str_index: str_index]
+						break
 					#print("still inside register while condition")
 					if line[str_index] in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
 						str_index += 1
@@ -1753,6 +1766,13 @@ def scan_for_parser(line_num, line, sar):
 			strt_str_index = str_index
 			str_index += 1
 			while (1):
+				if str_index > len(line) - 1:
+					return 13, str_index, line[strt_str_index: str_index]
+					break
+				if line[str_index] == "\n" or line[str_index] == "\r\n":
+					#if we reach the end of the line without a newline for some strange reason...end of file case
+					return 13, str_index, line[strt_str_index: str_index]
+					break
 				if line[str_index] in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
 					str_index += 1
 					#time to break loop
@@ -1834,7 +1854,8 @@ def scan_file(file):
 							#print("the word matches from syntax array",  line[str_index: str_index + len(syntax_array[sar])], syntax_array[sar])
 							#print("the word matches -%s- " % line[str_index: str_index + len(syntax_array[sar])])
 							str_index += len(syntax_array[sar])
-							present_category(line_num, sar)
+							if sar != 9:
+								present_category(line_num, sar)
 
 
 							
@@ -1861,6 +1882,10 @@ def scan_file(file):
 							if line[str_index] in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
 								str_index += 1
 								while (1):
+									if str_index > len(line) - 1:
+										#if we reach the end of the line without a newline for some strange reason...end of file case
+										present_category(line_num, 12, line[strt_str_index: str_index])
+										break
 									#print("still inside register while condition")
 									if line[str_index] in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
 										str_index += 1
@@ -1883,9 +1908,15 @@ def scan_file(file):
 						#check if lexeme is positive integer
 						elif line[str_index] in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
 							strt_str_index = str_index
+							
 							str_index += 1
 							while (1):
+								if str_index > len(line) - 1:
+									#if we reach the end of the line without a newline for some strange reason...end of file case
+									present_category(line_num, 13, line[strt_str_index: str_index])
+									break
 								if line[str_index] in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
+									print(" this is the number at this string index: ", line[str_index])
 									str_index += 1
 									#time to break loop
 								else:
@@ -1937,8 +1968,9 @@ def main():
 	(options, args) = parser.parse_args()
 
 	rename = options.x
+	#scan = options.s
 	'''
-	scan = options.s
+	
 	parse = options.p
 	read = options.r
 	
@@ -1952,6 +1984,10 @@ def main():
 	
 	#open file and execute appropriate command
 	file = open(str(filename), 'r')
+
+
+	#if scan:
+		#scan_file(file)
 
 	if rename:
 		#print intermediate representation
@@ -1988,7 +2024,6 @@ def main():
 
 if __name__ == "__main__":
 	main()
-
 
 
 
