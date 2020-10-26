@@ -40,6 +40,25 @@ class DoubleLinkedList:
 
 		return
 
+	def deleteSelf(self, curr): 
+
+		new_node = Node(new_data)  
+		new_node.next = None
+		if self.head is None: 
+			new_node.prev = None
+			self.head = new_node 
+			return
+		last = self.head 
+		while(last.next is not None): 
+			last = last.next
+
+		last.next = new_node 
+		new_node.prev = last 
+		self.last = new_node
+
+		return
+
+
 
 
 
@@ -64,6 +83,29 @@ class DoubleLinkedList:
   
 		if prev_node is None: 
 			print("This node doesn't exist in DLL") 
+			return
+  
+		#2. allocate node  & 3. put in the data 
+		new_node = Node(data = new_data) 
+  
+		# 4. Make next of new node as next of prev_node 
+		new_node.next = prev_node.next
+  
+		# 5. Make the next of prev_node as new_node  
+		prev_node.next = new_node 
+  
+		# 6. Make prev_node as previous of new_node 
+		new_node.prev = prev_node 
+  
+		# 7. Change previous of new_node's next node */ 
+		if new_node.next is not None: 
+			new_node.next.prev = new_node 
+		return
+
+	def insertBeforeSelf(self, curr): 
+  
+		if prev_node is None: 
+			self.head = curr
 			return
   
 		#2. allocate node  & 3. put in the data 
@@ -1017,11 +1059,14 @@ def allocate_easy(reg, file, max_live, lu, sr):
 def allocate_registers(reg, file):
 	
 	reg_stack = []
+	ir_list.printListContents(ir_list.head)
+
 	
 	max_live, lu, sr = rename_registers(file)
 	#print("max live is: ", max_live)
 	#print("number of registers is: ", reg)
 	#print(int(reg) > int(max_live))
+
 
 	reg = int(reg)
 	
@@ -1038,6 +1083,7 @@ def allocate_registers(reg, file):
 	
 	#vr should be initialized to be inverse of sr dict
 	vr2 = defaultdict(def_value)
+	pr0 = None
 	#dict of vr to pr
 	pr2 = defaultdict(def_value)
 	loc = 32768
@@ -1052,11 +1098,27 @@ def allocate_registers(reg, file):
 
 
 	#iterate through opcodes
+	#ir_list.printListContents(ir_list.head)
+	#print(" THAT WAS THE INTERMEDIATE REPRESENTATION BEFORE ^ ")
 	curr = ir_list.head
+	index = 0
 	while (curr != None) :
 		#print("curr " + curr)
 		#skip this process for nops
-		marked = []
+		#if index == 0:
+			#print("second attempt before IR changes ")
+			#ir_list.printListContents(ir_list.head)
+			
+			#index += 1
+		#break
+		#if curr.data[0] == 35:
+			#print(" this is first region! : ", curr.data[0])
+			#ir_list.printListContents(ir_list.head)
+
+		#if curr.data[0] == 35:
+			#print(" this is another first region! : ", curr.data[0])
+			#ir_list.printListContents(ir_list.head)
+		
 		if curr.data[1] not in ["nop", "output"]:
 		
 
@@ -1079,6 +1141,7 @@ def allocate_registers(reg, file):
 							spill_loc[pr2[pr]] = [loc, "-"]
 							#update loc value
 							loc = loc + 4
+
 						#update mapping so that spilled vr register maps to no physical register
 						#get old vr and update
 						old_vr = pr2[pr]
@@ -1090,9 +1153,9 @@ def allocate_registers(reg, file):
 						pr2[pr] = "-"
 
 				
-
+					
 					#restore use value
-					if spill_loc[curr.data[3]][1] != "-":
+					if spill_loc[curr.data[3]][1] == "remat":
 						#add loadi operation to IR directly if value being restored was originally constructed in a loadI op
 						#rematerialization
 						loadI = ["-"] *  14
@@ -1101,17 +1164,24 @@ def allocate_registers(reg, file):
 						loadI[2] = spill_loc[curr.data[3]][0]
 						loadI[12] = pr
 						loadI[13] = curr.data[0]
+						#print("passed first test")
 						#print("loadI rematerialization")
-						ir_list.insertAfter(curr.prev, loadI)
+						if curr.prev:
+							ir_list.insertAfter(curr.prev, loadI)
+						else:
+							ir_list.push(loadI)
 					else:
 						#otherwise use standard protocol to restore value
+						
 						restore(curr, spill_loc[vr][0], k, pr)	
 				#update pr in intermediate representation
 				curr.data[4] = pr
+
 				#update prvr mappings
 				#based on piazza post, commenting this out for a moment
 				vr2[vr] = pr
 				pr2[pr] = vr
+				pr0 = pr
 				'''
 				if pr2[pr] != vr:
 					print("equivalency fail 1:2a")
@@ -1119,10 +1189,13 @@ def allocate_registers(reg, file):
 					print("equivalency fail 1:2b")
 				'''
 				#mark next use of physical register in mapping
-				prnu[pr] = curr.data[5] 		
+				prnu[pr] = curr.data[5] 
+				
+						
 			#for second region of source registers
 			if curr.data[1] not in ["load", "loadI", "store"]:
-				pr0 = pr
+				
+				
 				#marked.append(pr)
 				vr = curr.data[7]
 				#if pr already  assigned use it
@@ -1134,7 +1207,7 @@ def allocate_registers(reg, file):
 						pr = reg_stack.pop()
 						
 					else:
-						pr, spilled = get_pr(curr, prnu, loc, k, None, spill_loc, pr2)
+						pr, spilled = get_pr(curr, prnu, loc, k, pr0, spill_loc, pr2)
 						#update vr to spillloc dict with previous vr
 						if spilled:
 							
@@ -1153,7 +1226,7 @@ def allocate_registers(reg, file):
 
 					
 					#restore use value
-					if spill_loc[curr.data[7]][1] != "-":
+					if spill_loc[curr.data[7]][1] == "remat":
 						#add loadi operation to IR directly if value being restored was originally constructed in a loadI op
 						#rematerialization
 						loadI = ["-"] *  14
@@ -1163,7 +1236,10 @@ def allocate_registers(reg, file):
 						loadI[12] = pr
 						loadI[13] = curr.data[0]
 						#print("loadI rematerialization")
-						ir_list.insertAfter(curr.prev, loadI)
+						if curr.prev:
+							ir_list.insertAfter(curr.prev, loadI)
+						else:
+							ir_list.push(loadI)
 					else:
 						#otherwise use standard protocol to restore value
 						restore(curr, spill_loc[vr][0], k, pr)
@@ -1196,7 +1272,9 @@ def allocate_registers(reg, file):
 				#add freed register to stack
 				reg_stack.append(curr.data[8])
 			'''
-			
+			#if curr.data[0] == 35:
+				#print(" this is second region! : ", curr.data[0])
+				#ir_list.printListContents(ir_list.head)
 			#pr1 = pr
 			#for last region store operation
 			if curr.data[1] == "store":
@@ -1204,16 +1282,15 @@ def allocate_registers(reg, file):
 				#if pr already  assigned use it
 				if vr2[vr] != "-":
 					pr = vr2[vr]
-					#print("store has the following value in mappings: ")
-					#print("pr2vr: %s  %s"  % (pr, vr))
-					#print("vr2pr: %s  %s"  % (vr, pr))
+					
 				#get a pr and restore use value
 				else:
 					if reg_stack: 
 						pr = reg_stack.pop()
 						
+						
 					else:
-						pr, spilled = get_pr(curr, prnu, loc, k, None, spill_loc, pr2)
+						pr, spilled = get_pr(curr, prnu, loc, k, pr0, spill_loc, pr2)
 						#update vr to spillloc dict with previous vr
 						if spilled:
 							
@@ -1230,9 +1307,10 @@ def allocate_registers(reg, file):
 						#this update is maybe redundant but just to be safe:
 						pr2[pr] = "-"
 					
-
+				
 					#restore use value for virtual register
-					if spill_loc[curr.data[11]][1] != "-":
+					
+					if spill_loc[curr.data[11]][1] == "remat":
 						#add loadi operation to IR directly if value being restored was originally constructed in a loadI op
 						#rematerialization
 						loadI = ["-"] *  14
@@ -1242,10 +1320,16 @@ def allocate_registers(reg, file):
 						loadI[12] = pr
 						loadI[13] = curr.data[0]
 						#print("loadI rematerialization")
-						ir_list.insertAfter(curr.prev, loadI)
+						
+						if curr.prev:
+							ir_list.insertAfter(curr.prev, loadI)
+						else:
+							ir_list.push(loadI)
 					else:
 						#otherwise use standard protocol to restore value
+					
 						restore(curr, spill_loc[vr][0], k, pr)	
+					
 				#update pr in intermediate representation
 				curr.data[12] = pr
 				#update prvr mappings
@@ -1260,6 +1344,7 @@ def allocate_registers(reg, file):
 				'''
 				#mark next use of physical register in mapping
 				prnu[pr] = curr.data[13] 
+
 
 				#check whether use is last use instance	
 				if curr.data[13] == "-":
@@ -1291,11 +1376,38 @@ def allocate_registers(reg, file):
 				#add freed register to stack
 				reg_stack.append(curr.data[8])	
 			
-
+			
 			#for last region of source registers
 			if curr.data[1] != "store":
 
 				vr = curr.data[11]
+				#to set up rematerializable values, add constants for loadI ops to spill dictionary
+				#delete loadI from IR, saving register not needed
+				if curr.data[1] == "loadI":
+					#print("going into the spill dictionary is line: ", curr.data[0])
+					spill_loc[vr] = [curr.data[2], "remat"]
+					#delete loadI from IR, saving register for contents is not needed
+					#print(" this is IR before deletion! : ", curr.data[0])
+					#ir_list.printListContents(ir_list.head)
+					
+					if curr.next:
+						curr.next.prev = curr.prev
+					if curr.prev:
+							
+						curr.prev.next = curr.next
+						
+					else:
+						
+						ir_list.head = curr.next
+					#print(" this is IR after deletion! : ", curr.data[0])
+					#ir_list.printListContents(ir_list.head)
+					#curr.prev.next = curr.next
+					#curr.next.prev = curr.prev
+					#curr = curr.prev
+					curr = curr.next
+					continue
+					#print("spill location at vr %d is : " % vr, [curr.data[2], "remat"])
+					
 				if reg_stack: 
 						pr = reg_stack[-1]
 						reg_stack.pop()
@@ -1324,56 +1436,17 @@ def allocate_registers(reg, file):
 				#update prvr mappings
 				vr2[vr] = pr
 				pr2[pr] = vr
-				'''
-				if pr2[pr] != vr:
-					print("equivalency fail 3:2a")
-					print("pr2vr: %s  %s"  % (pr, vr))
-					
-				if vr2[vr] != pr:
-					print("equivalency fail 3:2b")
-					print("vr2pr: %s  %s"  % (vr, pr))
-				'''
+				
 				
 				#mark next use of physical register in mapping
 				prnu[pr] = curr.data[13] 
 
-				#to set up rematerializable values, add constants for loadI ops to spill dictionary
-				
-				if curr.data[1] == "loadI":
-					#print("going into the spill dictionary is line: ", curr.data[0])
-					spill_loc[vr] = [curr.data[2], "remat"]
-					#print("spill location at vr %d is : " % vr, [curr.data[2], "remat"])
-					#update loc value
-					loc = loc + 4
-				
-
-
-			#check whether use is last use instance	
-			'''
-			if curr.data[13] == "-":
-				#reset spill dictionary at now free virtual register
-				spill_loc[pr2[pr]] = "-"
-				#free physical register
-				vr2[vr] = "-"
-				pr2[pr] = "-"
-				prnu[pr] = float('inf')
-				#add freed register to stack
-				reg_stack.append(pr)
-			'''
-		#add check for whether vr and pr dictionaries are equivalent
-		'''
-		for vra, pra in vr2.items():
-			prb = vr2[vra]
-			if pra != prb:
-				print("3: We have found a MISMATCHED dictionary at " )
-		'''
 		
-
-
 		curr = curr.next
-	#print("this is the final ir allowing for physical register placement")
+	
+	
+	
 	#ir_list.printListContents(ir_list.head)
-
 	print_reallocated_registers()      
 	return 
 
@@ -1457,9 +1530,12 @@ def get_pr(curr, prnu, loc, free_pr, old_pr, spill_loc, pr2):
 	#optimization - if the code has been previously spilled, it does not need code reinserted
 	vr = pr2[pr_val]
 	if spill_loc[vr][0] != "-":
+		#if the evicted register is loadI - no code required to spill
+		#we also can delete it from the intermediate representation
 		return pr_val, False
 
-	#if the evicted register is loadI - no code required to spill
+	
+
 	
 
 
